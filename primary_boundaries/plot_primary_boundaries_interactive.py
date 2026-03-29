@@ -99,6 +99,8 @@ def apply_school_tiers(boundaries: gpd.GeoDataFrame, good_schools_csv: Path) -> 
         good_keys = set(good_df["join_key"].astype(str).str.upper())
     elif "school_name" in good_df.columns:
         good_keys = set(good_df["school_name"].apply(join_key))
+    elif "School" in good_df.columns:
+        good_keys = set(good_df["School"].apply(join_key))
     else:
         good_keys = set()
 
@@ -236,11 +238,10 @@ def main() -> None:
     parser.add_argument(
         "--good-schools-csv",
         default=str(
-            Path(__file__).resolve().parent
-            / "outputs"
-            / "good_schools_top59.csv"
+            Path(__file__).resolve().parents[1]
+            / "good_primary_schools.csv"
         ),
-        help="CSV of top oversubscribed schools (good schools)",
+        help="CSV of good primary schools",
     )
     parser.add_argument(
         "--buffer-1km-out",
@@ -386,7 +387,7 @@ def main() -> None:
     print(f"Polygons loaded: {len(boundaries)}")
     print(f"MultiPolygon geometries simplified: {simplified}")
     print(f"Duplicate OBJECTID polygons removed: {removed_dups}")
-    print(f"Good-school polygons (top-59 mapping): {good_count}")
+    print(f"Good-school polygons (overall subscription rates mapping): {good_count}")
     print(f"Points loaded: {len(points)}")
     print(f"Saved cleaned boundaries: {cleaned_out}")
     print(f"Saved 1km buffers: {buffer_1km_out}")
