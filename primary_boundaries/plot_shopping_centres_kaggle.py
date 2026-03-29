@@ -78,6 +78,7 @@ def load_shopping_dataset(dataset_slug: str, csv_file: Optional[str]) -> pd.Data
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Plot shopping centres from Kaggle dataset")
+    default_inputs_dir = Path(__file__).resolve().parent / "inputs"
     parser.add_argument(
         "--dataset-slug",
         default="karthikgangula/shopping-mall-coordinates",
@@ -95,7 +96,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--ura-geojson",
-        default=r"C:\Users\User\Downloads\MasterPlan2025LandUseLayer.geojson",
+        default=str(default_inputs_dir / "MasterPlan2025LandUseLayer.geojson"),
         help="URA master plan polygons for point-in-polygon join",
     )
     args = parser.parse_args()

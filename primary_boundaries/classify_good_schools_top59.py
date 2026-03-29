@@ -1,5 +1,5 @@
 ﻿#!/usr/bin/env python
-"""Classify primary schools into good vs normal by oversubscription rank.
+"""Classify primary schools into good vs normal by overall subscription rates.
 
 Rule:
 - Good schools = top N (default 59) by oversubscription score.
@@ -45,10 +45,13 @@ def join_key(name: Any) -> str:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Classify good schools by oversubscription rank")
+    parser = argparse.ArgumentParser(
+        description="Classify good schools by overall subscription rates"
+    )
+    repo_root = Path(__file__).resolve().parents[1]
     parser.add_argument(
         "--school-ratio-csv",
-        default=r"C:\Users\User\primaryschoolscrap\schools.csv",
+        default=str(repo_root / "primaryschoolscrap" / "schools.csv"),
         help="Path to school oversubscription source file",
     )
     parser.add_argument(
@@ -90,33 +93,37 @@ def main() -> None:
             {
                 "school_name": row["Name"],
                 "join_key": join_key(row["Name"]),
-                "oversubscription_score": score,
+                "overall_subscription_rates": score,
                 "applicants_total": applicants,
                 "vacancies_total": vacancies,
             }
         )
 
-    ranking = pd.DataFrame(rows).dropna(subset=["oversubscription_score"]).copy()
+    ranking = pd.DataFrame(rows).dropna(subset=["overall_subscription_rates"]).copy()
     ranking = ranking.sort_values(
-        ["oversubscription_score", "applicants_total"],
+        ["overall_subscription_rates", "applicants_total"],
         ascending=[False, False],
     ).reset_index(drop=True)
     ranking["rank"] = ranking.index + 1
     ranking["is_good_school"] = ranking["rank"] <= int(args.top_n)
     ranking["school_tier"] = ranking["is_good_school"].map({True: "Good", False: "Normal"})
 
-    all_out = out_dir / "school_oversubscription_ranking.csv"
-    good_out = out_dir / "good_schools_top59.csv"
+    all_out = out_dir / "overall_subscription_rates.csv"
+    good_out = out_dir / "good_primary_schools.csv"
     normal_out = out_dir / "normal_schools_others.csv"
+    legacy_all_out = out_dir / "school_oversubscription_ranking.csv"
+    legacy_good_out = out_dir / "good_schools_top59.csv"
 
     ranking.to_csv(all_out, index=False, encoding="utf-8-sig")
+    ranking.to_csv(legacy_all_out, index=False, encoding="utf-8-sig")
     ranking[ranking["is_good_school"]].to_csv(good_out, index=False, encoding="utf-8-sig")
+    ranking[ranking["is_good_school"]].to_csv(legacy_good_out, index=False, encoding="utf-8-sig")
     ranking[~ranking["is_good_school"]].to_csv(normal_out, index=False, encoding="utf-8-sig")
 
     print("Done.")
     print(f"Total ranked schools: {len(ranking)}")
     print(f"Good schools (top {args.top_n}): {(ranking['is_good_school']).sum()}")
-    print(f"Saved ranking: {all_out}")
+    print(f"Saved overall subscription rates: {all_out}")
     print(f"Saved good schools: {good_out}")
     print(f"Saved normal schools: {normal_out}")
 

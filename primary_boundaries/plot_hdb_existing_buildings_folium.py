@@ -128,14 +128,15 @@ def build_resale_points(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Map HDB polygons with resale points on Folium")
+    default_inputs_dir = Path(__file__).resolve().parent / "inputs"
     parser.add_argument(
         "--hdb-geojson",
-        default=r"C:\Users\User\Downloads\HDBExistingBuilding.geojson",
+        default=str(default_inputs_dir / "HDBExistingBuilding.geojson"),
         help="Path to HDB existing building GeoJSON",
     )
     parser.add_argument(
         "--resale-csv",
-        default=r"C:\Users\User\Downloads\ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv",
+        default=str(default_inputs_dir / "ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv"),
         help="Path to HDB resale transactions CSV",
     )
     parser.add_argument(

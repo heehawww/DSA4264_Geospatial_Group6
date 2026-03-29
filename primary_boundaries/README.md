@@ -8,12 +8,12 @@ Script:
 - `tag_mrt_stations_with_kaggle_lines.py`
 
 Default inputs:
-- Schools point CSV: `C:\Users\User\Projects\primary school location\outputs\school_estate_summary.csv`
-- URA land-use polygons: `C:\Users\User\Downloads\MasterPlan2025LandUseLayer.geojson`
+- Schools point CSV: `primary_boundaries/inputs/school_estate_summary.csv`
+- URA land-use polygons: `primary_boundaries/inputs/MasterPlan2025LandUseLayer.geojson`
 
 Run:
 ```powershell
-python "C:\Users\User\Projects\primary school location\step1_primary_boundaries\join_primary_schools_to_ura_landuse.py"
+python ".\primary_boundaries\join_primary_schools_to_ura_landuse.py"
 ```
 
 Outputs (under `step1_primary_boundaries\outputs`):
@@ -25,8 +25,8 @@ Outputs (under `step1_primary_boundaries\outputs`):
 - `primary_school_boundaries_cleaned.geojson`
 - `primary_school_boundaries_buffer_1km.geojson`
 - `primary_school_boundaries_buffer_2km.geojson`
-- `school_oversubscription_ranking.csv`
-- `good_schools_top59.csv`
+- `overall_subscription_rates.csv`
+- `good_primary_schools.csv`
 - `normal_schools_others.csv`
 - `shopping_centres_points.geojson`
 - `shopping_centres_points.csv`

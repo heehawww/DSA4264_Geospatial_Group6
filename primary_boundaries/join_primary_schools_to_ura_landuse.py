@@ -137,9 +137,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(
         description="Join primary school points with containing URA land-use polygon"
     )
+    default_inputs_dir = Path(__file__).resolve().parent / "inputs"
     parser.add_argument(
         "--schools-csv",
-        default=r"C:\Users\User\Projects\primary school location\outputs\school_estate_summary.csv",
+        default=str(default_inputs_dir / "school_estate_summary.csv"),
         help="CSV containing primary school locations with latitude/longitude",
     )
     parser.add_argument(
@@ -154,7 +155,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--ura-geojson",
-        default=r"C:\Users\User\Downloads\MasterPlan2025LandUseLayer.geojson",
+        default=str(default_inputs_dir / "MasterPlan2025LandUseLayer.geojson"),
         help="URA land use GeoJSON",
     )
     parser.add_argument(

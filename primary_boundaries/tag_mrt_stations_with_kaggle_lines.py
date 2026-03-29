@@ -108,9 +108,10 @@ def write_geojson_with_list_properties(gdf: gpd.GeoDataFrame, path: Path) -> Non
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Tag MRT exits with line information from Kaggle")
+    default_inputs_dir = Path(__file__).resolve().parent / "inputs"
     parser.add_argument(
         "--mrt-exit-geojson",
-        default=r"C:\Users\User\Downloads\LTAMRTStationExitGEOJSON (1).geojson",
+        default=str(default_inputs_dir / "LTAMRTStationExitGEOJSON (1).geojson"),
         help="LTA MRT exit GeoJSON",
     )
     parser.add_argument(
