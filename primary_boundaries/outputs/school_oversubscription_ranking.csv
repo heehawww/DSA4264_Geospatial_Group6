@@ -1,4 +1,4 @@
-﻿school_name,join_key,oversubscription_score,applicants_total,vacancies_total,rank,is_good_school,school_tier
+﻿school_name,join_key,overall_subscription_rates,applicants_total,vacancies_total,rank,is_good_school,school_tier
 Princess Elizabeth Primary School,PRINCESSELIZABETHPRIMARYSCHOOL,3.584070796460177,405,113,1,True,Good
 South View Primary School,SOUTHVIEWPRIMARYSCHOOL,2.9291338582677167,372,127,2,True,Good
 Gongshang Primary School,GONGSHANGPRIMARYSCHOOL,2.572519083969466,337,131,3,True,Good
