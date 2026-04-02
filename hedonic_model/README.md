@@ -124,8 +124,8 @@ python3 hedonic_model/score_school_premium.py
 
 Outputs in `hedonic_model/scored_outputs/`:
 
-- `flat_school_premiums.csv`
-- `flat_school_premiums.geojson`
+- `flat_school_premiums_treated_only.csv`
+- `flat_school_premiums_treated_only.geojson`
 - `scoring_summary.json`
 
 The premium is computed as:
@@ -136,3 +136,8 @@ The premium is computed as:
   - `good_school_within_1km = 0`
 
 This should be interpreted as an estimated associated premium from the model, not a flat-level causal effect.
+
+Only treated flats are exported, defined as rows where:
+
+- `good_school_count_1km > 0`
+- `good_school_within_1km = 1`

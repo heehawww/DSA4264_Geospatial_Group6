@@ -51,6 +51,17 @@ EXPORT_COLUMNS = [
 ]
 
 
+def filter_treated_rows(raw_df: pd.DataFrame, model_df: pd.DataFrame) -> tuple[pd.DataFrame, pd.DataFrame]:
+    treated_mask = (
+        pd.to_numeric(raw_df.loc[model_df.index, "good_school_count_1km"], errors="coerce").fillna(0) > 0
+    ) & (
+        pd.to_numeric(model_df["good_school_within_1km"], errors="coerce").fillna(0) > 0
+    )
+
+    treated_indices = model_df.index[treated_mask]
+    return raw_df.loc[treated_indices].copy(), model_df.loc[treated_indices].copy()
+
+
 def load_points(points_path: Path) -> gpd.GeoDataFrame:
     points = gpd.read_file(points_path)
     if points.crs is None:
@@ -139,19 +150,23 @@ def main() -> None:
     print(f"Loading {input_csv} ...")
     raw_df = pd.read_csv(input_csv)
     model_df = engineer_features(raw_df)
+    raw_df_treated, model_df_treated = filter_treated_rows(raw_df, model_df)
+
+    if raw_df_treated.empty or model_df_treated.empty:
+        raise ValueError("No treated flats found with good_school_count_1km > 0.")
 
     print("Training predictive model on all rows for scoring...")
     predictive_model = fit_full_predictive_model(model_df)
 
-    print("Scoring premiums...")
-    scored = score_premiums(raw_df, model_df, predictive_model)
+    print("Scoring premiums for treated flats only...")
+    scored = score_premiums(raw_df_treated, model_df_treated, predictive_model)
 
-    csv_output = output_dir / "flat_school_premiums.csv"
+    csv_output = output_dir / "flat_school_premiums_treated_only.csv"
     scored.to_csv(csv_output, index=False)
 
     print("Joining geocoded address points and exporting GeoJSON...")
     points = load_points(points_geojson)
-    geojson_output = output_dir / "flat_school_premiums.geojson"
+    geojson_output = output_dir / "flat_school_premiums_treated_only.geojson"
     write_geojson(scored, points, geojson_output)
 
     summary = {
