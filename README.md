@@ -5,6 +5,12 @@ This project aims to estimate the effect of being located near a “good” prim
 
 A baseline hedonic regression pipeline is available in [hedonic_model/README.md](/Users/yongjun/Documents/New%20project/DSA4264_Geospatial_Group6/hedonic_model/README.md).
 
+Install the Python dependencies first:
+
+```bash
+pip install -r requirements.txt
+```
+
 Run from the repository root:
 
 ```bash
