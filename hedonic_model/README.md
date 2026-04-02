@@ -116,7 +116,7 @@ This is a useful local design, but it is still approximate because the project u
 
 ## Flat-Level Premium Scoring
 
-To score each resale transaction with an estimated premium associated with being near a good primary school:
+To score each treated resale transaction with an estimated premium associated with the number of good primary schools within `1km`:
 
 ```bash
 python3 hedonic_model/score_school_premium.py
@@ -124,20 +124,71 @@ python3 hedonic_model/score_school_premium.py
 
 Outputs in `hedonic_model/scored_outputs/`:
 
-- `flat_school_premiums_treated_only.csv`
-- `flat_school_premiums_treated_only.geojson`
+- `flat_good_school_count_premiums_treated_only.csv`
+- `flat_good_school_count_premiums_treated_only.geojson`
 - `scoring_summary.json`
+- `premium_model_summary.txt`
 
 The premium is computed as:
 
-- predicted price under the fitted hedonic model
+- predicted price under a clean premium model with `good_school_count_1km` as the only school treatment
 - minus a counterfactual prediction where:
   - `good_school_count_1km = 0`
-  - `good_school_within_1km = 0`
 
 This should be interpreted as an estimated associated premium from the model, not a flat-level causal effect.
 
 Only treated flats are exported, defined as rows where:
 
 - `good_school_count_1km > 0`
-- `good_school_within_1km = 1`
+
+## Reduced Binary Premium Scoring
+
+To score treated flats using a reduced model with `good_school_within_1km` as the only school treatment:
+
+```bash
+python3 hedonic_model/score_reduced_binary_school_premium.py
+```
+
+Outputs in `hedonic_model/scored_outputs/`:
+
+- `flat_reduced_binary_good_school_premiums_treated_only.csv`
+- `flat_reduced_binary_good_school_premiums_treated_only.geojson`
+- `reduced_binary_scoring_summary.json`
+- `reduced_binary_model_summary.txt`
+
+This reduced model keeps:
+
+- `good_school_within_1km`
+- structural controls
+- `town` fixed effects
+- `month` fixed effects
+- flat-type and flat-model fixed effects
+
+It intentionally excludes overlapping school-count variables and broader amenity controls to make the school premium easier to interpret.
+
+## Coefficient Trace
+
+To see when the `good_school_within_1km` coefficient changes sign as controls are added:
+
+```bash
+python3 hedonic_model/trace_school_premium_sign.py
+```
+
+Outputs in `hedonic_model/diagnostic_outputs/`:
+
+- `good_school_sign_trace.csv`
+- `good_school_sign_trace.json`
+
+## Town-Specific Premium Models
+
+To estimate the clean `good_school_count_1km` premium separately by town:
+
+```bash
+python3 hedonic_model/run_town_premium_models.py
+```
+
+Outputs in `hedonic_model/town_outputs/`:
+
+- `town_premium_results.csv`
+- `town_premium_skipped.csv`
+- `town_premium_results.json`

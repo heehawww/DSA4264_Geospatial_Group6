@@ -213,6 +213,8 @@ primary_boundaries/outputs/
 hedonic_model/outputs/
 hedonic_model/rdd_outputs/
 hedonic_model/scored_outputs/
+hedonic_model/diagnostic_outputs/
+hedonic_model/town_outputs/
 outputs/
 outputs/onemap/
 primary_boundaries/inputs/*
