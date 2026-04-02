@@ -113,3 +113,26 @@ The script reports three specifications at each bandwidth:
 - `school_fe` for a controlled local regression with school fixed effects
 
 This is a useful local design, but it is still approximate because the project uses address points rather than exact unit locations and pools multiple school markets together.
+
+## Flat-Level Premium Scoring
+
+To score each resale transaction with an estimated premium associated with being near a good primary school:
+
+```bash
+python3 hedonic_model/score_school_premium.py
+```
+
+Outputs in `hedonic_model/scored_outputs/`:
+
+- `flat_school_premiums.csv`
+- `flat_school_premiums.geojson`
+- `scoring_summary.json`
+
+The premium is computed as:
+
+- predicted price under the fitted hedonic model
+- minus a counterfactual prediction where:
+  - `good_school_count_1km = 0`
+  - `good_school_within_1km = 0`
+
+This should be interpreted as an estimated associated premium from the model, not a flat-level causal effect.
