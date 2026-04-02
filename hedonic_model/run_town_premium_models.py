@@ -38,6 +38,9 @@ def fit_town_model(town_df: pd.DataFrame, town: str) -> dict[str, float | int | 
     ci_low = coef - 1.96 * std_err
     ci_high = coef + 1.96 * std_err
     treated_share = float((town_df["good_school_count_1km"] > 0).mean())
+    premium_pct = float(math.exp(coef) - 1)
+    town_mean_price = float(town_df["resale_price"].mean())
+    town_median_price = float(town_df["resale_price"].median())
 
     return {
         "town": town,
@@ -46,7 +49,11 @@ def fit_town_model(town_df: pd.DataFrame, town: str) -> dict[str, float | int | 
         "coef_log_points": coef,
         "std_err": std_err,
         "p_value": float(model.pvalues["good_school_count_1km"]),
-        "premium_pct_per_additional_good_school_1km": float(math.exp(coef) - 1),
+        "premium_pct_per_additional_good_school_1km": premium_pct,
+        "premium_sgd_per_additional_good_school_1km_at_town_mean_price": premium_pct * town_mean_price,
+        "premium_sgd_per_additional_good_school_1km_at_town_median_price": premium_pct * town_median_price,
+        "town_mean_resale_price": town_mean_price,
+        "town_median_resale_price": town_median_price,
         "ci_low_pct": float(math.exp(ci_low) - 1),
         "ci_high_pct": float(math.exp(ci_high) - 1),
         "r_squared": float(model.rsquared),
