@@ -72,7 +72,7 @@ class OneMapRoutingClient:
     def __init__(
         self,
         api_key: str,
-        request_sleep_seconds: float = 0.0,
+        request_sleep_seconds: float = 0.05,
         timeout_seconds: int = 30,
         max_retries: int = 2,
         retry_backoff_seconds: float = 1.0,
@@ -84,6 +84,20 @@ class OneMapRoutingClient:
         self.retry_backoff_seconds = max(0.0, float(retry_backoff_seconds))
         self.session = requests.Session()
         self.session.headers.update({"Authorization": self.api_key})
+        self._memory_cache: dict[tuple[str, str], float | None] = {}
+        self.stats = {
+            "cache_hits": 0,
+            "api_calls": 0,
+            "status_200": 0,
+            "status_400_404": 0,
+            "status_401_403": 0,
+            "status_429_5xx": 0,
+            "request_errors": 0,
+        }
+
+    @staticmethod
+    def _coord_key(lat: float, lon: float) -> str:
+        return f"{float(lat):.6f},{float(lon):.6f}"
 
     @staticmethod
     def _extract_distance_m(payload: object) -> float | None:
@@ -118,9 +132,14 @@ class OneMapRoutingClient:
         self,
         origin: tuple[float, float],
         destination: tuple[float, float],
-    ) -> float | None:
+    ) -> tuple[float | None, bool]:
         o_lat, o_lon = origin
         d_lat, d_lon = destination
+        cache_key = (self._coord_key(o_lat, o_lon), self._coord_key(d_lat, d_lon))
+        if cache_key in self._memory_cache:
+            self.stats["cache_hits"] += 1
+            return self._memory_cache[cache_key], False
+
         params = {
             "routeType": "walk",
             "start": f"{o_lat:.7f},{o_lon:.7f}",
@@ -131,20 +150,51 @@ class OneMapRoutingClient:
         while True:
             attempt += 1
             try:
+                self.stats["api_calls"] += 1
                 resp = self.session.get(self.API_URL, params=params, timeout=self.timeout_seconds)
-                if resp.status_code in {429, 500, 502, 503, 504} and attempt <= (self.max_retries + 1):
-                    if self.retry_backoff_seconds > 0:
-                        time.sleep(self.retry_backoff_seconds * (attempt - 1))
-                    continue
+                if resp.status_code in {429, 500, 502, 503, 504}:
+                    self.stats["status_429_5xx"] += 1
+                    if attempt <= (self.max_retries + 1):
+                        if self.retry_backoff_seconds > 0:
+                            time.sleep(self.retry_backoff_seconds * (attempt - 1))
+                        continue
+                    self._memory_cache[cache_key] = None
+                    return None, True
+                if resp.status_code in {400, 404}:
+                    self.stats["status_400_404"] += 1
+                    self._memory_cache[cache_key] = None
+                    return None, True
+                if resp.status_code in {401, 403}:
+                    self.stats["status_401_403"] += 1
+                    raise RuntimeError(
+                        f"OneMap authorization failed ({resp.status_code}). Refresh ONEMAP_API_KEY."
+                    )
                 resp.raise_for_status()
+                self.stats["status_200"] += 1
                 payload = resp.json()
-                return self._extract_distance_m(payload)
+                distance = self._extract_distance_m(payload)
+                self._memory_cache[cache_key] = distance
+                return distance, True
             except requests.RequestException:
+                self.stats["request_errors"] += 1
                 if attempt <= (self.max_retries + 1):
                     if self.retry_backoff_seconds > 0:
                         time.sleep(self.retry_backoff_seconds * (attempt - 1))
                     continue
-                raise
+                self._memory_cache[cache_key] = None
+                return None, True
+
+    def get_stats_summary(self) -> str:
+        return (
+            "OneMap stats: "
+            f"api_calls={self.stats['api_calls']}, "
+            f"cache_hits={self.stats['cache_hits']}, "
+            f"ok={self.stats['status_200']}, "
+            f"bad_req_or_not_found={self.stats['status_400_404']}, "
+            f"auth={self.stats['status_401_403']}, "
+            f"rate_or_server={self.stats['status_429_5xx']}, "
+            f"request_errors={self.stats['request_errors']}"
+        )
 
     def get_walking_distances(
         self,
@@ -156,9 +206,9 @@ class OneMapRoutingClient:
 
         out: list[float | None] = [None] * len(destinations)
         for idx, destination in enumerate(destinations):
-            dist = self._fetch_walking_distance(origin, destination)
+            dist, used_api = self._fetch_walking_distance(origin, destination)
             out[idx] = dist
-            if self.request_sleep_seconds > 0:
+            if used_api and self.request_sleep_seconds > 0:
                 time.sleep(self.request_sleep_seconds)
 
         return out
@@ -272,6 +322,26 @@ def is_true(value) -> bool:
         return value != 0
     text = str(value).strip().lower()
     return text in {"1", "true", "yes", "y", "good"}
+
+
+def group_row_indices_by_coord(
+    point_latlon: np.ndarray,
+    decimals: int = 6,
+) -> tuple[list[int], dict[int, list[int]]]:
+    """Group row indices by rounded origin coordinate for API-call deduplication."""
+    key_to_rep: dict[tuple[float, float], int] = {}
+    rep_to_rows: dict[int, list[int]] = {}
+    rep_rows: list[int] = []
+    for idx, (lat, lon) in enumerate(point_latlon):
+        key = (round(float(lat), decimals), round(float(lon), decimals))
+        rep_idx = key_to_rep.get(key)
+        if rep_idx is None:
+            key_to_rep[key] = idx
+            rep_idx = idx
+            rep_rows.append(idx)
+            rep_to_rows[rep_idx] = []
+        rep_to_rows[rep_idx].append(idx)
+    return rep_rows, rep_to_rows
 
 
 def load_resale_with_points(
@@ -459,7 +529,8 @@ def add_mall_access_features(
     network_detour_factor: float = 1.0,
     distance_provider: str = "onemap",
     onemap_client: OneMapRoutingClient | None = None,
-    onemap_nearest_candidate_k: int = 25,
+    onemap_nearest_candidate_k: int = 3,
+    onemap_max_euclidean_route_m: float = 2000.0,
     osmnx_graph: nx.MultiDiGraph | None = None,
 ) -> gpd.GeoDataFrame:
     out = matched_points.copy()
@@ -473,6 +544,8 @@ def add_mall_access_features(
         raise ValueError("walk_distance_10min_m must be positive")
     if network_detour_factor <= 0:
         raise ValueError("network_detour_factor must be positive")
+    if onemap_max_euclidean_route_m <= 0:
+        raise ValueError("onemap_max_euclidean_route_m must be positive")
 
     pts_wgs = out.to_crs("EPSG:4326").copy()
     pts_proj = out.to_crs("EPSG:3414").copy()
@@ -495,26 +568,30 @@ def add_mall_access_features(
         if onemap_client is None:
             raise ValueError("onemap_client is required when distance_provider='onemap'")
 
-        nearest_names = []
-        nearest_walk_dist = []
-        within_counts = []
+        n = len(point_xy)
+        nearest_names: list[str] = [""] * n
+        nearest_walk_dist: list[float] = [np.nan] * n
+        within_counts: list[int] = [0] * n
 
-        radius_for_count = float(walk_distance_10min_m)
-        for i, (origin_xy, origin_ll) in enumerate(zip(point_xy, point_latlon)):
-            # Candidate set for 10-minute count: exact by lower-bound logic (walk >= euclidean).
-            count_candidates = tree.query_ball_point(origin_xy, r=radius_for_count)
-            count_destinations = [tuple(mall_latlon[idx]) for idx in count_candidates]
-            count_distances = onemap_client.get_walking_distances(tuple(origin_ll), count_destinations)
-            within_count = sum(
-                1 for d in count_distances if d is not None and d <= float(walk_distance_10min_m)
-            )
-            within_counts.append(int(within_count))
+        # 10-minute mall counts are Euclidean-only to reduce OneMap calls.
+        euclidean_radius_m = float(walk_distance_10min_m / network_detour_factor)
+        rep_rows, rep_to_rows = group_row_indices_by_coord(point_latlon)
+        for rep_idx in rep_rows:
+            origin_xy = point_xy[rep_idx]
+            origin_ll = point_latlon[rep_idx]
 
-            # Candidate set for nearest mall: top-k by euclidean to control API calls.
+            count_candidates = tree.query_ball_point(origin_xy, r=euclidean_radius_m)
+            within_count = int(len(count_candidates))
+
+            # Nearest mall by OneMap on constrained euclidean candidates only.
             euclid_d = np.sqrt(((mall_xy - origin_xy) ** 2).sum(axis=1))
-            sort_idx = np.argsort(euclid_d)
-            if onemap_nearest_candidate_k and onemap_nearest_candidate_k > 0:
-                sort_idx = sort_idx[: int(onemap_nearest_candidate_k)]
+            in_range_idx = np.where(euclid_d <= float(onemap_max_euclidean_route_m))[0]
+            if len(in_range_idx) == 0:
+                sort_idx = np.array([], dtype=int)
+            else:
+                sort_idx = in_range_idx[np.argsort(euclid_d[in_range_idx])]
+                if onemap_nearest_candidate_k and onemap_nearest_candidate_k > 0:
+                    sort_idx = sort_idx[: int(onemap_nearest_candidate_k)]
 
             near_destinations = [tuple(mall_latlon[idx]) for idx in sort_idx]
             near_distances = onemap_client.get_walking_distances(tuple(origin_ll), near_destinations)
@@ -529,14 +606,18 @@ def add_mall_access_features(
                     best_idx = idx_local
 
             if best_idx is None:
-                # Fallback if no OneMap route returned.
-                fallback_idx = int(nearest_idx[i])
-                nearest_names.append(str(mall_names[fallback_idx]))
-                nearest_walk_dist.append(float(nearest_euclid[i] * network_detour_factor))
+                fallback_idx = int(nearest_idx[rep_idx])
+                rep_name = str(mall_names[fallback_idx])
+                rep_dist = float(nearest_euclid[rep_idx] * network_detour_factor)
             else:
                 chosen_global_idx = int(sort_idx[best_idx])
-                nearest_names.append(str(mall_names[chosen_global_idx]))
-                nearest_walk_dist.append(float(best_dist))
+                rep_name = str(mall_names[chosen_global_idx])
+                rep_dist = float(best_dist)
+
+            for row_idx in rep_to_rows[rep_idx]:
+                nearest_names[row_idx] = rep_name
+                nearest_walk_dist[row_idx] = rep_dist
+                within_counts[row_idx] = within_count
 
         out["nearest_mall_name"] = nearest_names
         out["nearest_mall_walking_distance_m"] = nearest_walk_dist
@@ -698,7 +779,8 @@ def add_mrt_access_features(
     network_detour_factor: float = 1.0,
     distance_provider: str = "onemap",
     onemap_client: OneMapRoutingClient | None = None,
-    onemap_nearest_candidate_k: int = 40,
+    onemap_nearest_candidate_k: int = 10,
+    onemap_max_euclidean_route_m: float = 2000.0,
     osmnx_graph: nx.MultiDiGraph | None = None,
 ) -> gpd.GeoDataFrame:
     out = matched_points.copy()
@@ -712,6 +794,8 @@ def add_mrt_access_features(
         raise ValueError("walk_distance_10min_m must be positive")
     if network_detour_factor <= 0:
         raise ValueError("network_detour_factor must be positive")
+    if onemap_max_euclidean_route_m <= 0:
+        raise ValueError("onemap_max_euclidean_route_m must be positive")
 
     pts_wgs = out.to_crs("EPSG:4326").copy()
     pts_proj = out.to_crs("EPSG:3414").copy()
@@ -734,40 +818,41 @@ def add_mrt_access_features(
         if onemap_client is None:
             raise ValueError("onemap_client is required when distance_provider='onemap'")
 
-        nearest_station_names = []
-        nearest_station_distances = []
-        unique_line_counts = []
-        radius_for_count = float(walk_distance_10min_m)
+        n = len(point_xy)
+        nearest_station_names: list[str] = [""] * n
+        nearest_station_distances: list[float] = [np.nan] * n
+        unique_line_counts: list[int] = [0] * n
+        euclidean_radius_m = float(walk_distance_10min_m / network_detour_factor)
 
-        for i, (origin_xy, origin_ll) in enumerate(zip(point_xy, point_latlon)):
-            # Count of unique lines within 10-min walk:
-            # first candidate exits by euclidean lower bound, then true walking filter via OneMap.
-            count_candidates = tree.query_ball_point(origin_xy, r=radius_for_count)
-            count_destinations = [tuple(mrt_latlon[idx]) for idx in count_candidates]
-            count_distances = onemap_client.get_walking_distances(tuple(origin_ll), count_destinations)
+        rep_rows, rep_to_rows = group_row_indices_by_coord(point_latlon)
+        for rep_idx in rep_rows:
+            origin_xy = point_xy[rep_idx]
+            origin_ll = point_latlon[rep_idx]
 
+            # Unique lines within 10-min distance via euclidean approximation only.
+            count_candidates = tree.query_ball_point(origin_xy, r=euclidean_radius_m)
             station_lines_map: dict[str, set[str]] = {}
-            for idx_local, dist in enumerate(count_distances):
-                if dist is None or dist > float(walk_distance_10min_m):
-                    continue
-                idx_global = count_candidates[idx_local]
+            for idx_global in count_candidates:
                 st = station_values[idx_global]
                 if st not in station_lines_map:
                     station_lines_map[st] = set()
                 for line_name in lines_values[idx_global]:
                     if line_name:
                         station_lines_map[st].add(str(line_name).strip())
-
             merged_lines = set()
             for st in station_lines_map:
                 merged_lines.update(station_lines_map[st])
-            unique_line_counts.append(int(len(merged_lines)))
+            rep_unique_line_count = int(len(merged_lines))
 
-            # Nearest station by walking distance (approximate search budget via top-k exits by euclidean).
+            # Nearest station by OneMap on constrained euclidean candidates only.
             euclid_d = np.sqrt(((mrt_xy - origin_xy) ** 2).sum(axis=1))
-            sort_idx = np.argsort(euclid_d)
-            if onemap_nearest_candidate_k and onemap_nearest_candidate_k > 0:
-                sort_idx = sort_idx[: int(onemap_nearest_candidate_k)]
+            in_range_idx = np.where(euclid_d <= float(onemap_max_euclidean_route_m))[0]
+            if len(in_range_idx) == 0:
+                sort_idx = np.array([], dtype=int)
+            else:
+                sort_idx = in_range_idx[np.argsort(euclid_d[in_range_idx])]
+                if onemap_nearest_candidate_k and onemap_nearest_candidate_k > 0:
+                    sort_idx = sort_idx[: int(onemap_nearest_candidate_k)]
             near_destinations = [tuple(mrt_latlon[idx]) for idx in sort_idx]
             near_distances = onemap_client.get_walking_distances(tuple(origin_ll), near_destinations)
 
@@ -783,12 +868,17 @@ def add_mrt_access_features(
                     best_station = st
 
             if best_station is None:
-                fallback_idx = int(nearest_idx[i])
-                nearest_station_names.append(str(station_values[fallback_idx]))
-                nearest_station_distances.append(float(nearest_euclid[i] * network_detour_factor))
+                fallback_idx = int(nearest_idx[rep_idx])
+                rep_station_name = str(station_values[fallback_idx])
+                rep_station_dist = float(nearest_euclid[rep_idx] * network_detour_factor)
             else:
-                nearest_station_names.append(str(best_station))
-                nearest_station_distances.append(float(best_dist))
+                rep_station_name = str(best_station)
+                rep_station_dist = float(best_dist)
+
+            for row_idx in rep_to_rows[rep_idx]:
+                nearest_station_names[row_idx] = rep_station_name
+                nearest_station_distances[row_idx] = rep_station_dist
+                unique_line_counts[row_idx] = rep_unique_line_count
 
         out["nearest_mrt_station_name"] = nearest_station_names
         out["nearest_mrt_walking_distance_m"] = nearest_station_distances
@@ -899,6 +989,208 @@ def add_mrt_access_features(
     return out
 
 
+def split_resale_into_parts(
+    resale_csv: Path,
+    parts_dir: Path,
+    part_size: int = 2500,
+) -> list[Path]:
+    if part_size <= 0:
+        raise ValueError("part_size must be positive")
+    parts_dir.mkdir(parents=True, exist_ok=True)
+
+    part_paths: list[Path] = []
+    for i, chunk in enumerate(pd.read_csv(resale_csv, chunksize=int(part_size)), start=1):
+        part_path = parts_dir / f"resale_part_{i:04d}.csv"
+        chunk.to_csv(part_path, index=False, encoding="utf-8-sig")
+        part_paths.append(part_path)
+    return part_paths
+
+
+def append_rows_to_csv(df: pd.DataFrame, output_csv: Path) -> None:
+    write_header = not output_csv.exists() or output_csv.stat().st_size == 0
+    df.to_csv(
+        output_csv,
+        index=False,
+        mode="a" if not write_header else "w",
+        header=write_header,
+        encoding="utf-8-sig" if write_header else "utf-8",
+    )
+
+
+def append_geojson_rows(
+    gdf: gpd.GeoDataFrame,
+    output_geojson: Path,
+    dedupe_cols: list[str] | None = None,
+) -> None:
+    if gdf.empty:
+        return
+    incoming = ensure_wgs84(gdf.copy())
+    if output_geojson.exists():
+        existing = ensure_wgs84(gpd.read_file(output_geojson))
+        combined = pd.concat([existing, incoming], ignore_index=True)
+        combined = gpd.GeoDataFrame(combined, geometry="geometry", crs="EPSG:4326")
+    else:
+        combined = incoming
+
+    if dedupe_cols:
+        cols = [c for c in dedupe_cols if c in combined.columns]
+        if cols:
+            combined = combined.drop_duplicates(subset=cols, keep="first")
+
+    combined.to_file(output_geojson, driver="GeoJSON")
+
+
+def update_postal_summary_csv(
+    matched_points: gpd.GeoDataFrame,
+    point_count_by_postal_out: Path,
+) -> None:
+    if "POSTAL_COD" in matched_points.columns:
+        part_postal = matched_points.copy()
+        part_postal["postal_code"] = part_postal["POSTAL_COD"].astype(str).str.strip()
+        part_postal = part_postal[part_postal["postal_code"].str.len() > 0]
+        part_postal = (
+            part_postal.groupby("postal_code", as_index=False)
+            .size()
+            .rename(columns={"size": "count"})
+        )
+    else:
+        part_postal = pd.DataFrame(columns=["postal_code", "count"])
+
+    if point_count_by_postal_out.exists():
+        existing = pd.read_csv(point_count_by_postal_out)
+        merged = pd.concat([existing, part_postal], ignore_index=True)
+    else:
+        merged = part_postal
+
+    if merged.empty:
+        merged = pd.DataFrame(columns=["postal_code", "count"])
+    else:
+        merged = (
+            merged.groupby("postal_code", as_index=False)["count"]
+            .sum()
+            .sort_values(["count", "postal_code"], ascending=[False, True])
+        )
+    merged.to_csv(point_count_by_postal_out, index=False, encoding="utf-8-sig")
+
+
+def build_resale_features_for_csv(
+    resale_csv: Path,
+    geocode_cache_csv: Path,
+    hdb_polygons: gpd.GeoDataFrame,
+    buffer_1km_gdf: gpd.GeoDataFrame,
+    buffer_2km_gdf: gpd.GeoDataFrame,
+    malls_gdf: gpd.GeoDataFrame,
+    mrt_seed: gpd.GeoDataFrame,
+    walk_distance_10min_m: float,
+    network_detour_factor: float,
+    distance_provider: str,
+    onemap_client: OneMapRoutingClient | None,
+    onemap_nearest_candidate_k: int,
+    onemap_max_euclidean_route_mall_m: float,
+    onemap_max_euclidean_route_mrt_m: float,
+    osmnx_network_type: str,
+    osmnx_buffer_m: float,
+) -> tuple[pd.DataFrame, gpd.GeoDataFrame, gpd.GeoDataFrame, pd.DataFrame, int]:
+    resale_df, resale_points = load_resale_with_points(resale_csv, geocode_cache_csv)
+
+    matched_points, unmatched_points, matched_polygons, poly_id_col = assign_points_to_hdb_polygons(
+        resale_points,
+        hdb_polygons,
+    )
+
+    counts_1km = count_school_intersections(matched_polygons, buffer_1km_gdf, poly_id_col, "1km")
+    counts_2km = count_school_intersections(matched_polygons, buffer_2km_gdf, poly_id_col, "2km")
+
+    polygon_counts = (
+        matched_polygons[[poly_id_col]]
+        .drop_duplicates()
+        .merge(counts_1km, on=poly_id_col, how="left")
+        .merge(counts_2km, on=poly_id_col, how="left")
+        .fillna(0)
+    )
+    for col in [
+        "school_count_1km",
+        "good_school_count_1km",
+        "school_count_2km",
+        "good_school_count_2km",
+    ]:
+        polygon_counts[col] = polygon_counts[col].astype(int)
+
+    osmnx_graph = None
+    if distance_provider.lower() == "osmnx":
+        osmnx_graph = build_osmnx_graph(
+            matched_points=matched_points,
+            malls_gdf=malls_gdf,
+            mrt_gdf=mrt_seed,
+            network_type=str(osmnx_network_type),
+            buffer_m=float(osmnx_buffer_m),
+        )
+
+    matched_points = add_mall_access_features(
+        matched_points,
+        malls_gdf,
+        walk_distance_10min_m=walk_distance_10min_m,
+        network_detour_factor=network_detour_factor,
+        distance_provider=distance_provider,
+        onemap_client=onemap_client,
+        onemap_nearest_candidate_k=onemap_nearest_candidate_k,
+        onemap_max_euclidean_route_m=onemap_max_euclidean_route_mall_m,
+        osmnx_graph=osmnx_graph,
+    )
+    matched_points = add_mrt_access_features(
+        matched_points,
+        mrt_seed,
+        walk_distance_10min_m=walk_distance_10min_m,
+        network_detour_factor=network_detour_factor,
+        distance_provider=distance_provider,
+        onemap_client=onemap_client,
+        onemap_nearest_candidate_k=int(onemap_nearest_candidate_k),
+        onemap_max_euclidean_route_m=onemap_max_euclidean_route_mrt_m,
+        osmnx_graph=osmnx_graph,
+    )
+
+    point_cols = [poly_id_col, "address_key"]
+    point_cols += first_existing(matched_points.columns, ["BLK_NO", "POSTAL_COD", "ST_COD", "ENTITYID"])
+    point_cols += first_existing(
+        matched_points.columns,
+        [
+            "nearest_mall_name",
+            "nearest_mall_walking_distance_m",
+            "malls_within_10min_walk",
+            "nearest_mrt_station_name",
+            "nearest_mrt_walking_distance_m",
+            "mrt_unique_lines_within_10min_walk",
+        ],
+    )
+    address_map = (
+        matched_points[point_cols]
+        .drop_duplicates(subset=["address_key"], keep="first")
+        .merge(polygon_counts, on=poly_id_col, how="left")
+    )
+
+    resale_out = resale_df.merge(address_map, on="address_key", how="inner")
+    for col in [
+        "school_count_1km",
+        "good_school_count_1km",
+        "school_count_2km",
+        "good_school_count_2km",
+        "malls_within_10min_walk",
+        "mrt_unique_lines_within_10min_walk",
+    ]:
+        resale_out[col] = resale_out[col].fillna(0).astype(int)
+    if "nearest_mall_walking_distance_m" in resale_out.columns:
+        resale_out["nearest_mall_walking_distance_m"] = pd.to_numeric(
+            resale_out["nearest_mall_walking_distance_m"], errors="coerce"
+        )
+    if "nearest_mrt_walking_distance_m" in resale_out.columns:
+        resale_out["nearest_mrt_walking_distance_m"] = pd.to_numeric(
+            resale_out["nearest_mrt_walking_distance_m"], errors="coerce"
+        )
+
+    matched_points_out = matched_points.merge(polygon_counts, on=poly_id_col, how="left")
+    return resale_out, matched_points_out, unmatched_points, resale_points, int(len(resale_df))
+
+
 def main() -> None:
     load_env_file(Path(__file__).resolve().parent / ".env")
     load_env_file(Path(__file__).resolve().parents[1] / ".env")
@@ -972,7 +1264,7 @@ def main() -> None:
     parser.add_argument(
         "--onemap-request-sleep-seconds",
         type=float,
-        default=0.0,
+        default=0.05,
         help="Optional delay between OneMap API requests",
     )
     parser.add_argument(
@@ -984,8 +1276,26 @@ def main() -> None:
     parser.add_argument(
         "--onemap-nearest-candidate-k",
         type=int,
-        default=25,
+        default=3,
         help="Top-K nearest euclidean candidates to evaluate via OneMap for nearest-distance fields",
+    )
+    parser.add_argument(
+        "--onemap-max-euclidean-route-mall-m",
+        type=float,
+        default=4000.0,
+        help="Only call OneMap routing for mall candidates when euclidean distance <= this threshold (meters)",
+    )
+    parser.add_argument(
+        "--onemap-max-euclidean-route-mrt-m",
+        type=float,
+        default=2000.0,
+        help="Only call OneMap routing for MRT candidates when euclidean distance <= this threshold (meters)",
+    )
+    parser.add_argument(
+        "--onemap-max-euclidean-route-m",
+        type=float,
+        default=None,
+        help="Legacy override: if provided, applies the same euclidean OneMap threshold to both mall and MRT",
     )
     parser.add_argument(
         "--osmnx-network-type",
@@ -1029,6 +1339,17 @@ def main() -> None:
         default=None,
         help="Optional CSV output for matched resale address-point counts by polygon postal code",
     )
+    parser.add_argument(
+        "--dataset-parts-dir",
+        default=str(Path(__file__).resolve().parent / "dataset parts"),
+        help="Directory for crash-resume chunk files (2.5k rows per part by default)",
+    )
+    parser.add_argument(
+        "--dataset-part-size",
+        type=int,
+        default=2500,
+        help="Rows per dataset part",
+    )
     args = parser.parse_args()
 
     resale_csv = Path(args.resale_csv)
@@ -1038,8 +1359,15 @@ def main() -> None:
     school_buffer_2km = Path(args.school_buffer_2km)
     mall_points_geojson = Path(args.mall_points_geojson)
     mrt_tagged_geojson = Path(args.mrt_tagged_geojson)
+    dataset_parts_dir = Path(args.dataset_parts_dir)
     out_dir = Path(args.output_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
+
+    onemap_max_mall_m = float(args.onemap_max_euclidean_route_mall_m)
+    onemap_max_mrt_m = float(args.onemap_max_euclidean_route_mrt_m)
+    if args.onemap_max_euclidean_route_m is not None:
+        onemap_max_mall_m = float(args.onemap_max_euclidean_route_m)
+        onemap_max_mrt_m = float(args.onemap_max_euclidean_route_m)
 
     if not resale_csv.exists():
         raise FileNotFoundError(f"Resale CSV not found: {resale_csv}")
@@ -1062,7 +1390,6 @@ def main() -> None:
         )
 
     onemap_client = None
-    osmnx_graph = None
     if args.distance_provider == "onemap":
         onemap_client = OneMapRoutingClient(
             api_key=str(args.onemap_api_key),
@@ -1073,165 +1400,119 @@ def main() -> None:
     output_csv = (
         Path(args.output_csv)
         if args.output_csv
-        else out_dir / "resale_flats_with_school_buffer_counts.csv"
+        else out_dir / "resale_flats_with_school_buffer_counts_onemap.csv"
     )
     matched_geojson_out = (
         Path(args.matched_addresses_geojson)
         if args.matched_addresses_geojson
-        else out_dir / "resale_address_points_matched_with_school_counts.geojson"
+        else out_dir / "resale_address_points_matched_with_school_counts_onemap.geojson"
     )
     unmatched_geojson_out = (
         Path(args.unmatched_addresses_geojson)
         if args.unmatched_addresses_geojson
-        else out_dir / "resale_address_points_unmatched.geojson"
+        else out_dir / "resale_address_points_unmatched_onemap.geojson"
     )
     point_count_by_postal_out = (
         Path(args.point_count_by_postal_csv)
         if args.point_count_by_postal_csv
-        else out_dir / "resale_address_point_count_by_postal_code.csv"
+        else out_dir / "resale_address_point_count_by_postal_code_onemap.csv"
     )
 
-    print("Loading resale transactions and building address points...")
-    resale_df, resale_points = load_resale_with_points(resale_csv, geocode_cache_csv)
+    print("Preparing crash-resume dataset parts...")
+    if dataset_parts_dir.exists():
+        part_files = sorted(dataset_parts_dir.glob("*.csv"))
+        if not part_files:
+            dataset_parts_dir.rmdir()
+            print("`dataset parts` existed but was empty. Removed folder and exiting.")
+            return
+        print(f"Found existing `dataset parts` with {len(part_files)} file(s). Resuming from parts.")
+    else:
+        print("`dataset parts` not found. Splitting resale dataset into parts of 2,500 rows...")
+        part_files = split_resale_into_parts(
+            resale_csv=resale_csv,
+            parts_dir=dataset_parts_dir,
+            part_size=int(args.dataset_part_size),
+        )
+        print(f"Created {len(part_files)} part file(s) in: {dataset_parts_dir}")
+        if output_csv.exists():
+            print(f"Fresh part-run detected. Removing old output CSV: {output_csv}")
+            output_csv.unlink()
+        for aux_path in [matched_geojson_out, unmatched_geojson_out, point_count_by_postal_out]:
+            if aux_path.exists():
+                aux_path.unlink()
 
-    print("Loading HDB polygons and matching resale points to polygons...")
+    if not part_files:
+        print("No part files found to process.")
+        return
+
+    print("Loading static layers...")
     hdb_polygons = ensure_wgs84(gpd.read_file(hdb_geojson))
-    matched_points, unmatched_points, matched_polygons, poly_id_col = assign_points_to_hdb_polygons(
-        resale_points,
-        hdb_polygons,
-    )
-
-    print("Loading school buffers and counting polygon intersections...")
     buffer_1km_gdf = load_school_buffer(school_buffer_1km)
     buffer_2km_gdf = load_school_buffer(school_buffer_2km)
-
-    counts_1km = count_school_intersections(matched_polygons, buffer_1km_gdf, poly_id_col, "1km")
-    counts_2km = count_school_intersections(matched_polygons, buffer_2km_gdf, poly_id_col, "2km")
-
-    polygon_counts = (
-        matched_polygons[[poly_id_col]]
-        .drop_duplicates()
-        .merge(counts_1km, on=poly_id_col, how="left")
-        .merge(counts_2km, on=poly_id_col, how="left")
-        .fillna(0)
-    )
-    for col in [
-        "school_count_1km",
-        "good_school_count_1km",
-        "school_count_2km",
-        "good_school_count_2km",
-    ]:
-        polygon_counts[col] = polygon_counts[col].astype(int)
-
-    print("Loading mall points and computing mall accessibility features...")
     malls_gdf = load_mall_points(mall_points_geojson)
-    if args.distance_provider == "osmnx":
-        print("Building OSMnx walking graph (cache disabled)...")
-        mrt_seed = load_mrt_exits_with_lines(mrt_tagged_geojson)
-        osmnx_graph = build_osmnx_graph(
-            matched_points=matched_points,
+    mrt_seed = load_mrt_exits_with_lines(mrt_tagged_geojson)
+
+    total_resale_rows_loaded = 0
+    total_resale_points = 0
+    total_matched_points = 0
+    total_unmatched_points = 0
+    total_transactions_retained = 0
+
+    for i, part_file in enumerate(sorted(dataset_parts_dir.glob("*.csv")), start=1):
+        print(f"[Part {i}] Processing: {part_file.name}")
+        resale_out, matched_points_out, unmatched_points, resale_points, resale_rows_loaded = build_resale_features_for_csv(
+            resale_csv=part_file,
+            geocode_cache_csv=geocode_cache_csv,
+            hdb_polygons=hdb_polygons,
+            buffer_1km_gdf=buffer_1km_gdf,
+            buffer_2km_gdf=buffer_2km_gdf,
             malls_gdf=malls_gdf,
-            mrt_gdf=mrt_seed,
-            network_type=str(args.osmnx_network_type),
-            buffer_m=float(args.osmnx_buffer_m),
-        )
-    else:
-        mrt_seed = None
-
-    matched_points = add_mall_access_features(
-        matched_points,
-        malls_gdf,
-        walk_distance_10min_m=args.walk_distance_10min_m,
-        network_detour_factor=args.network_detour_factor,
-        distance_provider=args.distance_provider,
-        onemap_client=onemap_client,
-        onemap_nearest_candidate_k=args.onemap_nearest_candidate_k,
-        osmnx_graph=osmnx_graph,
-    )
-    print("Loading MRT points and computing MRT accessibility features...")
-    mrt_gdf = mrt_seed if mrt_seed is not None else load_mrt_exits_with_lines(mrt_tagged_geojson)
-    matched_points = add_mrt_access_features(
-        matched_points,
-        mrt_gdf,
-        walk_distance_10min_m=args.walk_distance_10min_m,
-        network_detour_factor=args.network_detour_factor,
-        distance_provider=args.distance_provider,
-        onemap_client=onemap_client,
-        onemap_nearest_candidate_k=max(int(args.onemap_nearest_candidate_k), 40),
-        osmnx_graph=osmnx_graph,
-    )
-
-    # Map polygon-level counts back to unique resale addresses, then to all transactions.
-    point_cols = [poly_id_col, "address_key"]
-    point_cols += first_existing(matched_points.columns, ["BLK_NO", "POSTAL_COD", "ST_COD", "ENTITYID"])
-    point_cols += first_existing(
-        matched_points.columns,
-        [
-            "nearest_mall_name",
-            "nearest_mall_walking_distance_m",
-            "malls_within_10min_walk",
-            "nearest_mrt_station_name",
-            "nearest_mrt_walking_distance_m",
-            "mrt_unique_lines_within_10min_walk",
-        ],
-    )
-    address_map = (
-        matched_points[point_cols]
-        .drop_duplicates(subset=["address_key"], keep="first")
-        .merge(polygon_counts, on=poly_id_col, how="left")
-    )
-
-    resale_out = resale_df.merge(address_map, on="address_key", how="inner")
-    for col in [
-        "school_count_1km",
-        "good_school_count_1km",
-        "school_count_2km",
-        "good_school_count_2km",
-        "malls_within_10min_walk",
-        "mrt_unique_lines_within_10min_walk",
-    ]:
-        resale_out[col] = resale_out[col].fillna(0).astype(int)
-    if "nearest_mall_walking_distance_m" in resale_out.columns:
-        resale_out["nearest_mall_walking_distance_m"] = pd.to_numeric(
-            resale_out["nearest_mall_walking_distance_m"], errors="coerce"
-        )
-    if "nearest_mrt_walking_distance_m" in resale_out.columns:
-        resale_out["nearest_mrt_walking_distance_m"] = pd.to_numeric(
-            resale_out["nearest_mrt_walking_distance_m"], errors="coerce"
+            mrt_seed=mrt_seed,
+            walk_distance_10min_m=float(args.walk_distance_10min_m),
+            network_detour_factor=float(args.network_detour_factor),
+            distance_provider=str(args.distance_provider),
+            onemap_client=onemap_client,
+            onemap_nearest_candidate_k=int(args.onemap_nearest_candidate_k),
+            onemap_max_euclidean_route_mall_m=float(onemap_max_mall_m),
+            onemap_max_euclidean_route_mrt_m=float(onemap_max_mrt_m),
+            osmnx_network_type=str(args.osmnx_network_type),
+            osmnx_buffer_m=float(args.osmnx_buffer_m),
         )
 
-    # Save outputs.
-    resale_out.to_csv(output_csv, index=False, encoding="utf-8-sig")
+        append_rows_to_csv(resale_out, output_csv)
+        append_geojson_rows(matched_points_out, matched_geojson_out, dedupe_cols=["address_key"])
+        append_geojson_rows(unmatched_points, unmatched_geojson_out, dedupe_cols=["address_key"])
+        update_postal_summary_csv(matched_points_out, point_count_by_postal_out)
 
-    matched_points_out = matched_points.merge(polygon_counts, on=poly_id_col, how="left")
-    matched_points_out.to_file(matched_geojson_out, driver="GeoJSON")
-    unmatched_points.to_file(unmatched_geojson_out, driver="GeoJSON")
+        total_resale_rows_loaded += int(resale_rows_loaded)
+        total_resale_points += int(len(resale_points))
+        total_matched_points += int(len(matched_points_out))
+        total_unmatched_points += int(len(unmatched_points))
+        total_transactions_retained += int(len(resale_out))
 
-    # Additional summary: number of matched resale address points by polygon postal code.
-    if "POSTAL_COD" in matched_points.columns:
-        postal_summary = matched_points.copy()
-        postal_summary["postal_code"] = postal_summary["POSTAL_COD"].astype(str).str.strip()
-        postal_summary = postal_summary[postal_summary["postal_code"].str.len() > 0]
-        postal_summary = (
-            postal_summary.groupby("postal_code", as_index=False)
-            .size()
-            .rename(columns={"size": "count"})
-            .sort_values(["count", "postal_code"], ascending=[False, True])
+        part_file.unlink()
+        remaining = len(list(dataset_parts_dir.glob("*.csv")))
+        print(
+            f"[Part {i}] Done. Retained transactions={len(resale_out)}. "
+            f"Deleted part. Remaining parts={remaining}"
         )
-    else:
-        postal_summary = pd.DataFrame(columns=["postal_code", "count"])
-    postal_summary.to_csv(point_count_by_postal_out, index=False, encoding="utf-8-sig")
+
+    if dataset_parts_dir.exists() and len(list(dataset_parts_dir.glob('*.csv'))) == 0:
+        dataset_parts_dir.rmdir()
+        print("All parts processed. Removed `dataset parts` folder.")
 
     print("Done.")
-    print(f"Resale rows loaded: {len(resale_df)}")
-    print(f"Unique resale address points with geometry: {len(resale_points)}")
-    print(f"Matched address points in HDB polygons: {len(matched_points)}")
-    print(f"Unmatched address points (outside polygons): {len(unmatched_points)}")
-    print(f"Transactions retained (within polygons): {len(resale_out)}")
+    print(f"Resale rows loaded: {total_resale_rows_loaded}")
+    print(f"Unique resale address points with geometry: {total_resale_points}")
+    print(f"Matched address points in HDB polygons: {total_matched_points}")
+    print(f"Unmatched address points (outside polygons): {total_unmatched_points}")
+    print(f"Transactions retained (within polygons): {total_transactions_retained}")
     print(f"Saved resale dataset: {output_csv}")
     print(f"Saved matched address points: {matched_geojson_out}")
     print(f"Saved unmatched address points: {unmatched_geojson_out}")
     print(f"Saved point-count summary by postal code: {point_count_by_postal_out}")
+    if onemap_client is not None:
+        print(onemap_client.get_stats_summary())
 
 
 if __name__ == "__main__":
