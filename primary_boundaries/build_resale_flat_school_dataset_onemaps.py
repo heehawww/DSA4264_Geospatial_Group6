@@ -1316,7 +1316,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output-dir",
-        default=str(Path(__file__).resolve().parents[1] / "outputs" / "onemap"),
+        default=str(Path(__file__).resolve().parent / "outputs" / "onemap"),
         help="Output directory",
     )
     parser.add_argument(

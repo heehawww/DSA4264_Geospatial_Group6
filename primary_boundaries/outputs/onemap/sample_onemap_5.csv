@@ -1,0 +1,6 @@
+﻿address_key,nearest_mall_name,nearest_mall_walking_distance_m,malls_within_10min_walk,nearest_mrt_station_name,nearest_mrt_walking_distance_m,mrt_unique_lines_within_10min_walk
+ANG MO KIO|406|ANG MO KIO AVE 10,AMK Hub,1270.0,0,ANG MO KIO MRT STATION,1124.0,0
+ANG MO KIO|108|ANG MO KIO AVE 4,Broadway Plaza,1381.0,0,MAYFLOWER MRT STATION,196.0,1
+ANG MO KIO|602|ANG MO KIO AVE 5,Broadway Plaza,2056.0,0,LENTOR MRT STATION,459.0,1
+ANG MO KIO|465|ANG MO KIO AVE 10,AMK Hub,1300.0,0,ANG MO KIO MRT STATION,1102.0,0
+ANG MO KIO|601|ANG MO KIO AVE 5,Broadway Plaza,2101.0,0,LENTOR MRT STATION,399.0,1
