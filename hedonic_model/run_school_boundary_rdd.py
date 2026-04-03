@@ -161,7 +161,13 @@ def run_local_linear_rdd(df: pd.DataFrame, bandwidth_m: int, specification: str)
     return model, table
 
 
-def extract_rdd_metrics(model: object, bandwidth_m: int, sample_size: int, spec_name: str) -> dict[str, float | int | str]:
+def extract_rdd_metrics(
+    model: object,
+    local_df: pd.DataFrame,
+    bandwidth_m: int,
+    sample_size: int,
+    spec_name: str,
+) -> dict[str, float | int | str]:
     if "treat" not in model.params.index:
         raise ValueError("RDD model did not estimate a treatment jump.")
 
@@ -169,6 +175,9 @@ def extract_rdd_metrics(model: object, bandwidth_m: int, sample_size: int, spec_
     std_err = float(model.bse["treat"])
     ci_low = coef - 1.96 * std_err
     ci_high = coef + 1.96 * std_err
+    premium_pct = float(math.exp(coef) - 1)
+    mean_price = float(local_df["resale_price"].mean())
+    median_price = float(local_df["resale_price"].median())
     return {
         "specification": spec_name,
         "bandwidth_m": int(bandwidth_m),
@@ -176,7 +185,11 @@ def extract_rdd_metrics(model: object, bandwidth_m: int, sample_size: int, spec_
         "cutoff_coef_log_points": coef,
         "cutoff_std_err": std_err,
         "cutoff_p_value": float(model.pvalues["treat"]),
-        "cutoff_premium_pct": float(math.exp(coef) - 1),
+        "cutoff_premium_pct": premium_pct,
+        "cutoff_price_jump_sgd_at_local_mean_price": premium_pct * mean_price,
+        "cutoff_price_jump_sgd_at_local_median_price": premium_pct * median_price,
+        "local_mean_resale_price": mean_price,
+        "local_median_resale_price": median_price,
         "cutoff_ci_low_pct": float(math.exp(ci_low) - 1),
         "cutoff_ci_high_pct": float(math.exp(ci_high) - 1),
         "r_squared": float(model.rsquared),
@@ -290,8 +303,9 @@ def main() -> None:
         for spec_name in ("uncontrolled", "controlled", "school_fe"):
             print(f"Estimating {spec_name} RDD at {bandwidth_m}m bandwidth...")
             model, coef_table = run_local_linear_rdd(model_df, bandwidth_m=bandwidth_m, specification=spec_name)
-            local_n = int((model_df["distance_abs_m"] <= bandwidth_m).sum())
-            results.append(extract_rdd_metrics(model, bandwidth_m, local_n, spec_name))
+            local_df = model_df.loc[model_df["distance_abs_m"] <= bandwidth_m].copy()
+            local_n = int(len(local_df))
+            results.append(extract_rdd_metrics(model, local_df, bandwidth_m, local_n, spec_name))
             coefficient_tables.append(coef_table.assign(specification=spec_name, bandwidth_m=bandwidth_m))
 
         for outcome in BASE_CONTROLS:
