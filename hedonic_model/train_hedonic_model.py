@@ -20,7 +20,7 @@ from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 
-NUMERIC_FEATURES = [
+BASELINE_NUMERIC_FEATURES = [
     "floor_area_sqm",
     "lease_age_years",
     "remaining_lease_years",
@@ -49,6 +49,37 @@ NUMERIC_FEATURES = [
     "pcns_within_5min_walk",
 ]
 
+REDUCED_NUMERIC_FEATURES = [
+    "floor_area_sqm",
+    "lease_age_years",
+    "storey_mid",
+    "months_since_start",
+    "ln_nearest_mall_walking_distance_m",
+    "malls_within_10min_walk",
+    "ln_nearest_mrt_walking_distance_m",
+    "mrt_unique_lines_within_10min_walk",
+    "school_count_1km",
+    "good_school_count_1km",
+    "school_count_2km",
+    "good_school_count_2km",
+    "ln_nearest_bus_stop_walking_distance_m",
+    "bus_stops_within_5min_walk",
+    "ln_nearest_hawker_centre_walking_distance_m",
+    "hawker_centres_within_5min_walk",
+    "ln_nearest_supermarket_walking_distance_m",
+    "supermarkets_within_10min_walk",
+    "ln_nearest_park_walking_distance_m",
+    "parks_within_5min_walk",
+    "ln_nearest_pcn_walking_distance_m",
+    "pcns_within_5min_walk",
+]
+
+FEATURE_SPECS = {
+    "baseline": BASELINE_NUMERIC_FEATURES,
+    "reduced": REDUCED_NUMERIC_FEATURES,
+}
+
+NUMERIC_FEATURES = BASELINE_NUMERIC_FEATURES
 PREDICTIVE_CATEGORICAL_FEATURES = ["town", "flat_type", "flat_model"]
 
 OLS_FORMULA = """
@@ -96,7 +127,8 @@ def add_log_distance(df: pd.DataFrame, source: str) -> pd.Series:
     return np.log(values)
 
 
-def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
+def engineer_features(df: pd.DataFrame, numeric_features: list[str] | None = None) -> pd.DataFrame:
+    numeric_features = numeric_features or NUMERIC_FEATURES
     work = df.copy()
     work["month_dt"] = pd.to_datetime(work["month"], format="%Y-%m", errors="coerce")
     work["month_period"] = work["month_dt"].dt.to_period("M").astype(str)
@@ -123,10 +155,10 @@ def engineer_features(df: pd.DataFrame) -> pd.DataFrame:
     ]:
         work[f"ln_{column}"] = add_log_distance(work, column)
 
-    required_columns = ["log_resale_price", *NUMERIC_FEATURES, *PREDICTIVE_CATEGORICAL_FEATURES, "month_period"]
+    required_columns = ["log_resale_price", *BASELINE_NUMERIC_FEATURES, *PREDICTIVE_CATEGORICAL_FEATURES, "month_period"]
     work = work.dropna(subset=["log_resale_price", "month_dt", "floor_area_sqm", "resale_price"])
 
-    for column in NUMERIC_FEATURES:
+    for column in BASELINE_NUMERIC_FEATURES:
         work[column] = pd.to_numeric(work[column], errors="coerce")
 
     return work[required_columns + ["resale_price", "month_dt"]].copy()
@@ -142,7 +174,12 @@ def time_split(df: pd.DataFrame, test_months: int) -> tuple[pd.DataFrame, pd.Dat
     return train, test
 
 
-def fit_predictive_model(train: pd.DataFrame, test: pd.DataFrame) -> tuple[Pipeline, dict[str, float], pd.DataFrame]:
+def fit_predictive_model(
+    train: pd.DataFrame,
+    test: pd.DataFrame,
+    numeric_features: list[str] | None = None,
+) -> tuple[Pipeline, dict[str, float], pd.DataFrame]:
+    numeric_features = numeric_features or NUMERIC_FEATURES
     preprocessor = ColumnTransformer(
         transformers=[
             (
@@ -153,7 +190,7 @@ def fit_predictive_model(train: pd.DataFrame, test: pd.DataFrame) -> tuple[Pipel
                         ("scaler", StandardScaler()),
                     ]
                 ),
-                NUMERIC_FEATURES,
+                numeric_features,
             ),
             (
                 "cat",
@@ -175,8 +212,8 @@ def fit_predictive_model(train: pd.DataFrame, test: pd.DataFrame) -> tuple[Pipel
         ]
     )
 
-    X_train = train[NUMERIC_FEATURES + PREDICTIVE_CATEGORICAL_FEATURES]
-    X_test = test[NUMERIC_FEATURES + PREDICTIVE_CATEGORICAL_FEATURES]
+    X_train = train[numeric_features + PREDICTIVE_CATEGORICAL_FEATURES]
+    X_test = test[numeric_features + PREDICTIVE_CATEGORICAL_FEATURES]
     y_train = train["log_resale_price"]
     y_test = test["log_resale_price"]
 
@@ -256,6 +293,12 @@ def main() -> None:
         default=42,
         help="Random seed for reproducible OLS sampling",
     )
+    parser.add_argument(
+        "--feature-spec",
+        choices=sorted(FEATURE_SPECS.keys()),
+        default="baseline",
+        help="Predictive feature specification to use",
+    )
     args = parser.parse_args()
 
     input_csv = Path(args.input_csv)
@@ -265,15 +308,20 @@ def main() -> None:
     if not input_csv.exists():
         raise FileNotFoundError(f"Input CSV not found: {input_csv}")
 
+    numeric_features = FEATURE_SPECS[args.feature_spec]
     print(f"Loading {input_csv} ...")
     raw = pd.read_csv(input_csv)
-    model_df = engineer_features(raw)
+    model_df = engineer_features(raw, numeric_features=numeric_features)
     train_df, test_df = time_split(model_df, args.test_months)
 
     print(f"Training rows: {len(train_df):,}")
     print(f"Testing rows: {len(test_df):,}")
 
-    _, metrics, feature_importance = fit_predictive_model(train_df, test_df)
+    _, metrics, feature_importance = fit_predictive_model(
+        train_df,
+        test_df,
+        numeric_features=numeric_features,
+    )
     coefficients, ols_model, premium_pct, ols_rows = fit_ols_model(
         train_df,
         max_rows=args.ols_max_rows,
@@ -284,6 +332,7 @@ def main() -> None:
     metrics["rows_train"] = int(len(train_df))
     metrics["rows_test"] = int(len(test_df))
     metrics["rows_ols"] = int(ols_rows)
+    metrics["feature_spec"] = args.feature_spec
     metrics["good_school_within_1km_premium_pct_from_ols"] = float(premium_pct)
 
     (output_dir / "metrics.json").write_text(json.dumps(metrics, indent=2))

@@ -58,8 +58,14 @@ Optional arguments:
 python3 hedonic_model/train_hedonic_model.py \
   --input-csv "walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv" \
   --output-dir hedonic_model/outputs \
-  --test-months 12
+  --test-months 12 \
+  --feature-spec reduced
 ```
+
+Feature specs:
+
+- `baseline`: original richer predictive feature set
+- `reduced`: pruned feature set that removes the most redundant time, lease, and school indicators for a lower-multicollinearity predictive model
 
 ## Outputs
 
@@ -113,58 +119,6 @@ The script reports three specifications at each bandwidth:
 - `school_fe` for a controlled local regression with school fixed effects
 
 This is a useful local design, but it is still approximate because the project uses address points rather than exact unit locations and pools multiple school markets together.
-
-## Flat-Level Premium Scoring
-
-To score each treated resale transaction with an estimated premium associated with the number of good primary schools within `1km`:
-
-```bash
-python3 hedonic_model/score_school_premium.py
-```
-
-Outputs in `hedonic_model/scored_outputs/`:
-
-- `flat_good_school_count_premiums_treated_only.csv`
-- `flat_good_school_count_premiums_treated_only.geojson`
-- `scoring_summary.json`
-- `premium_model_summary.txt`
-
-The premium is computed as:
-
-- predicted price under a clean premium model with `good_school_count_1km` as the only school treatment
-- minus a counterfactual prediction where:
-  - `good_school_count_1km = 0`
-
-This should be interpreted as an estimated associated premium from the model, not a flat-level causal effect.
-
-Only treated flats are exported, defined as rows where:
-
-- `good_school_count_1km > 0`
-
-## Reduced Binary Premium Scoring
-
-To score treated flats using a reduced model with `good_school_within_1km` as the only school treatment:
-
-```bash
-python3 hedonic_model/score_reduced_binary_school_premium.py
-```
-
-Outputs in `hedonic_model/scored_outputs/`:
-
-- `flat_reduced_binary_good_school_premiums_treated_only.csv`
-- `flat_reduced_binary_good_school_premiums_treated_only.geojson`
-- `reduced_binary_scoring_summary.json`
-- `reduced_binary_model_summary.txt`
-
-This reduced model keeps:
-
-- `good_school_within_1km`
-- structural controls
-- `town` fixed effects
-- `month` fixed effects
-- flat-type and flat-model fixed effects
-
-It intentionally excludes overlapping school-count variables and broader amenity controls to make the school premium easier to interpret.
 
 ## Coefficient Trace
 
