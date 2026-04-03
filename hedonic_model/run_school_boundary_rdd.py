@@ -131,6 +131,34 @@ def compute_signed_distances(points: gpd.GeoDataFrame, buffers: gpd.GeoDataFrame
     return pd.DataFrame(rows)
 
 
+def compute_school_specific_distances(
+    points: gpd.GeoDataFrame,
+    buffers: gpd.GeoDataFrame,
+    max_bandwidth_m: int,
+) -> pd.DataFrame:
+    rows: list[dict[str, object]] = []
+
+    for school_row in buffers.itertuples(index=False):
+        boundary = school_row.geometry.boundary
+        for point_row in points.itertuples(index=False):
+            distance_m = float(point_row.geometry.distance(boundary))
+            if distance_m > max_bandwidth_m:
+                continue
+            inside = bool(school_row.geometry.covers(point_row.geometry))
+            rows.append(
+                {
+                    "address_key": point_row.address_key,
+                    "boundary_school_name": school_row.school_name,
+                    "boundary_school_join_key": school_row.join_key,
+                    "overall_subscription_rates": getattr(school_row, "overall_subscription_rates", np.nan),
+                    "signed_distance_m": -distance_m if inside else distance_m,
+                    "inside_good_school_1km": int(inside),
+                }
+            )
+
+    return pd.DataFrame(rows)
+
+
 def triangular_weights(distance_abs_m: pd.Series, bandwidth_m: int) -> pd.Series:
     weights = 1 - distance_abs_m / bandwidth_m
     return weights.clip(lower=0)
@@ -218,6 +246,77 @@ def run_balance_check(df: pd.DataFrame, bandwidth_m: int, outcome: str) -> dict[
     }
 
 
+def run_school_specific_rdd(
+    model_df: pd.DataFrame,
+    bandwidths: list[int],
+    min_total: int,
+    min_each_side: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    results: list[dict[str, float | int | str]] = []
+    coefficient_tables: list[pd.DataFrame] = []
+    skipped: list[dict[str, float | int | str]] = []
+
+    for school_name, school_df in model_df.groupby("boundary_school_name"):
+        for bandwidth_m in bandwidths:
+            local_df = school_df.loc[school_df["distance_abs_m"] <= bandwidth_m].copy()
+            inside_n = int((local_df["signed_distance_m"] <= 0).sum())
+            outside_n = int((local_df["signed_distance_m"] > 0).sum())
+            total_n = int(len(local_df))
+
+            if total_n < min_total or inside_n < min_each_side or outside_n < min_each_side:
+                skipped.append(
+                    {
+                        "boundary_school_name": school_name,
+                        "bandwidth_m": int(bandwidth_m),
+                        "sample_size": total_n,
+                        "inside_n": inside_n,
+                        "outside_n": outside_n,
+                        "reason": "insufficient_boundary_sample",
+                    }
+                )
+                continue
+
+            for spec_name in ("uncontrolled", "controlled"):
+                model, coef_table = run_local_linear_rdd(
+                    school_df,
+                    bandwidth_m=bandwidth_m,
+                    specification=spec_name,
+                )
+                result = extract_rdd_metrics(model, local_df, bandwidth_m, total_n, spec_name)
+                result["boundary_school_name"] = school_name
+                result["inside_n"] = inside_n
+                result["outside_n"] = outside_n
+                results.append(result)
+                coefficient_tables.append(
+                    coef_table.assign(
+                        boundary_school_name=school_name,
+                        specification=spec_name,
+                        bandwidth_m=bandwidth_m,
+                    )
+                )
+
+    if results:
+        results_df = pd.DataFrame(results).sort_values(["boundary_school_name", "bandwidth_m", "specification"])
+    else:
+        results_df = pd.DataFrame(
+            columns=[
+                "boundary_school_name",
+                "specification",
+                "bandwidth_m",
+                "sample_size",
+                "inside_n",
+                "outside_n",
+            ]
+        )
+    coef_df = pd.concat(coefficient_tables, ignore_index=True) if coefficient_tables else pd.DataFrame()
+    skipped_df = (
+        pd.DataFrame(skipped).sort_values(["boundary_school_name", "bandwidth_m"])
+        if skipped
+        else pd.DataFrame(columns=["boundary_school_name", "bandwidth_m", "sample_size", "inside_n", "outside_n", "reason"])
+    )
+    return results_df, coef_df, skipped_df
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Boundary RDD around the 1km good-school cutoff")
     parser.add_argument(
@@ -247,6 +346,18 @@ def main() -> None:
         default=[100, 200, 300, 500],
         help="Bandwidths in meters for local linear RDD",
     )
+    parser.add_argument(
+        "--school-min-total",
+        type=int,
+        default=150,
+        help="Minimum total local observations required for school-specific RDD",
+    )
+    parser.add_argument(
+        "--school-min-each-side",
+        type=int,
+        default=40,
+        help="Minimum observations required on each side of the cutoff for school-specific RDD",
+    )
     args = parser.parse_args()
 
     transactions_path = Path(args.transactions_csv)
@@ -270,6 +381,7 @@ def main() -> None:
 
     print("Loading good-school 1km buffers...")
     buffers = load_good_school_buffers(buffers_path)
+    max_bandwidth_m = max(args.bandwidths)
 
     print("Computing signed distances to nearest good-school buffer boundary...")
     signed_distances = compute_signed_distances(points, buffers)
@@ -320,15 +432,55 @@ def main() -> None:
     balance_df.to_csv(output_dir / "rdd_covariate_balance.csv", index=False)
     (output_dir / "rdd_results.json").write_text(results_df.to_json(orient="records", indent=2))
 
+    print("Computing school-specific signed distances near each good-school boundary...")
+    school_specific_distances = compute_school_specific_distances(points, buffers, max_bandwidth_m=max_bandwidth_m)
+    school_specific_model_df = transactions.merge(
+        school_specific_distances,
+        on="address_key",
+        how="inner",
+        validate="m:m",
+    )
+    school_specific_model_df["distance_abs_m"] = school_specific_model_df["signed_distance_m"].abs()
+    school_specific_model_df = school_specific_model_df.dropna(
+        subset=[
+            "log_resale_price",
+            "floor_area_sqm",
+            "lease_age_years",
+            "remaining_lease_years",
+            "storey_mid",
+            "signed_distance_m",
+        ]
+    )
+
+    school_results_df, school_coef_df, school_skipped_df = run_school_specific_rdd(
+        school_specific_model_df,
+        bandwidths=args.bandwidths,
+        min_total=args.school_min_total,
+        min_each_side=args.school_min_each_side,
+    )
+
+    school_specific_distances.to_csv(output_dir / "school_specific_address_signed_distances.csv", index=False)
+    school_results_df.to_csv(output_dir / "school_specific_rdd_results.csv", index=False)
+    school_coef_df.to_csv(output_dir / "school_specific_rdd_coefficients.csv", index=False)
+    school_skipped_df.to_csv(output_dir / "school_specific_rdd_skipped.csv", index=False)
+    (output_dir / "school_specific_rdd_results.json").write_text(
+        school_results_df.to_json(orient="records", indent=2)
+    )
+
     summary = {
         "transactions_with_geocoded_addresses": int(model_df["address_key"].nunique()),
         "transaction_rows_used": int(len(model_df)),
         "good_school_buffers": int(len(buffers)),
         "bandwidths_m": args.bandwidths,
+        "school_specific_rows_used": int(len(school_specific_model_df)),
+        "school_specific_schools_with_results": int(school_results_df["boundary_school_name"].nunique()) if not school_results_df.empty else 0,
     }
     (output_dir / "rdd_summary.json").write_text(json.dumps(summary, indent=2))
 
     print(results_df.to_string(index=False))
+    if not school_results_df.empty:
+        print("\nSchool-specific RDD results:")
+        print(school_results_df.to_string(index=False))
     print(f"Wrote RDD outputs to {output_dir}")
 
 
