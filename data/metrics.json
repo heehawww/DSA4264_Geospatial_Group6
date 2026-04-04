@@ -1,0 +1,13 @@
+{
+  "train_r2_log": 0.9088769643994963,
+  "test_r2_log": 0.9148038769630742,
+  "train_rmse_sgd": 55427.27011592092,
+  "test_rmse_sgd": 58568.63280507482,
+  "train_mae_sgd": 39777.63618556398,
+  "test_mae_sgd": 43845.365893452756,
+  "rows_total": 223550,
+  "rows_train": 200744,
+  "rows_test": 22806,
+  "rows_ols": 100000,
+  "good_school_within_1km_premium_pct_from_ols": -0.016242839027471367
+}

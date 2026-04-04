@@ -1,0 +1,11 @@
+{
+  "transactions_with_geocoded_addresses": 9568,
+  "transaction_rows_used": 223550,
+  "good_school_buffers": 38,
+  "bandwidths_m": [
+    100,
+    200,
+    300,
+    500
+  ]
+}

@@ -8,6 +8,7 @@ import json
 import math
 import re
 from pathlib import Path
+import joblib
 
 import numpy as np
 import pandas as pd
@@ -273,7 +274,9 @@ def main() -> None:
     print(f"Training rows: {len(train_df):,}")
     print(f"Testing rows: {len(test_df):,}")
 
-    _, metrics, feature_importance = fit_predictive_model(train_df, test_df)
+    ridge_pipeline, metrics, feature_importance = fit_predictive_model(train_df, test_df)
+    joblib.dump(ridge_pipeline, output_dir / "ridge_pipeline.pkl")
+    print(f"Saved Ridge pipeline to {output_dir / 'ridge_pipeline.pkl'}")
     coefficients, ols_model, premium_pct, ols_rows = fit_ols_model(
         train_df,
         max_rows=args.ols_max_rows,
