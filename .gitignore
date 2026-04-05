@@ -209,8 +209,8 @@ walking time to nearest xx/outputs/*.csv
 
 # Project geospatial data artifacts (large/generated)
 primary_boundaries/cache/
-#primary_boundaries/outputs/
-#outputs/
-#outputs/onemap/
+primary_boundaries/outputs/
+outputs/
+outputs/onemap/
 primary_boundaries/inputs/*
 !primary_boundaries/inputs/README.md
