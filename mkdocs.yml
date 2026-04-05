@@ -1,0 +1,8 @@
+site_name: DSA4264 Geospatial Group 6
+site_description: Technical report and project documentation
+repo_url: https://github.com/heehawww/DSA4264_Geospatial_Group6
+theme:
+  name: readthedocs
+nav:
+  - Home: index.md
+  - Technical Report: technical_report.md
