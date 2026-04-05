@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+      <link rel="shortcut icon" href="../img/favicon.ico" />
+    <title>Technical Report - DSA4264 Geospatial Group 6</title>
+    <link rel="stylesheet" href="../css/theme.css" />
+    <link rel="stylesheet" href="../css/theme_extra.css" />
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/github.min.css" />
+    
+      <script>
+        // Current page data
+        var mkdocs_page_name = "Technical Report";
+        var mkdocs_page_input_path = "technical_report.md";
+        var mkdocs_page_url = null;
+      </script>
+    
+    <!--[if lt IE 9]>
+      <script src="../js/html5shiv.min.js"></script>
+    <![endif]-->
+      <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+      <script>hljs.highlightAll();</script> 
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side stickynav">
+    <div class="wy-side-scroll">
+      <div class="wy-side-nav-search">
+          <a href=".." class="icon icon-home"> DSA4264 Geospatial Group 6
+        </a><div role="search">
+  <form id ="rtd-search-form" class="wy-form" action="../search.html" method="get">
+      <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" title="Type search term here" />
+  </form>
+</div>
+      </div>
+
+      <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+                <li class="toctree-l1"><a class="reference internal" href="..">Home</a>
+                </li>
+              </ul>
+              <ul class="current">
+                <li class="toctree-l1 current"><a class="reference internal current" href="#">Technical Report</a>
+    <ul class="current">
+    <li class="toctree-l2"><a class="reference internal" href="#1-context">1. Context</a>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#2-scope">2. Scope</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#21-problem">2.1 Problem</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#22-success-criteria">2.2 Success Criteria</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#23-assumptions">2.3 Assumptions</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#3-methodology">3. Methodology</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#31-technical-assumptions">3.1 Technical Assumptions</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#32-data">3.2 Data</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#33-experimental-design">3.3 Experimental Design</a>
+    </li>
+        </ul>
+    </li>
+    <li class="toctree-l2"><a class="reference internal" href="#4-findings">4. Findings</a>
+        <ul>
+    <li class="toctree-l3"><a class="reference internal" href="#41-results">4.1 Results</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#42-discussion">4.2 Discussion</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#43-recommendations">4.3 Recommendations</a>
+    </li>
+        </ul>
+    </li>
+    </ul>
+                </li>
+              </ul>
+      </div>
+    </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+      <nav class="wy-nav-top" role="navigation" aria-label="Mobile navigation menu">
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="..">DSA4264 Geospatial Group 6</a>
+        
+      </nav>
+      <div class="wy-nav-content">
+        <div class="rst-content"><div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href=".." class="icon icon-home" aria-label="Docs"></a></li>
+      <li class="breadcrumb-item active">Technical Report</li>
+    <li class="wy-breadcrumbs-aside">
+          <a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/edit/master/docs/technical_report.md" class="icon icon-github"> Edit on GitHub</a>
+    </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+            <div class="section" itemprop="articleBody">
+              
+                <h1 id="technical-report-estimating-the-hdb-resale-price-effect-of-proximity-to-oversubscribed-primary-schools">Technical Report: Estimating the HDB Resale Price Effect of Proximity to Oversubscribed Primary Schools</h1>
+<h2 id="1-context">1. Context</h2>
+<p>Housing demand in Singapore is strongly shaped by access to public amenities, and school access has become a recurring policy and public concern. In practice, households often treat proximity to competitive primary schools as a key criterion when selecting resale flats. From a Ministry of National Development (MND) perspective, this creates a practical policy question: how much of observed resale price variation is associated with school-access effects, and how much is explained by other structural and accessibility factors.</p>
+<p>This project was initiated to support that question with an auditable, data-driven workflow. The objective is not only predictive performance, but also policy interpretability: if we quantify a school-access premium, we need to understand when it appears, where it appears, and whether it remains after controlling for confounders.</p>
+<p>The implementation evolved across branches in the repository:</p>
+<table>
+<thead>
+<tr>
+<th>Branch</th>
+<th>Role in project</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/main"><code>main</code></a> / <code>webscraper</code></td>
+<td>Initial MOE school-data scraping setup</td>
+</tr>
+<tr>
+<td><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Web_Crawler"><code>Web_Crawler</code></a></td>
+<td>Crawler refinements for school-vacancy/balloting extraction</td>
+</tr>
+<tr>
+<td><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Data-Preprocessing"><code>Data-Preprocessing</code></a></td>
+<td>Geospatial integration and feature engineering pipeline</td>
+</tr>
+<tr>
+<td><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Hedonic-Model"><code>Hedonic-Model</code></a></td>
+<td>Hedonic regression, boundary RDD, and town-level heterogeneous-effect analysis</td>
+</tr>
+</tbody>
+</table>
+<p>Within <code>Data-Preprocessing</code>, the core geospatial workflow is implemented in:</p>
+<ul>
+<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/join_primary_schools_to_ura_landuse.py"><code>primary_boundaries/join_primary_schools_to_ura_landuse.py</code></a></li>
+<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/build_resale_flat_school_dataset_onemaps.py"><code>primary_boundaries/build_resale_flat_school_dataset_onemaps.py</code></a></li>
+</ul>
+<p>Within <code>Hedonic-Model</code>, model estimation is implemented in:</p>
+<ul>
+<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/train_hedonic_model.py"><code>hedonic_model/train_hedonic_model.py</code></a></li>
+<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py"><code>hedonic_model/run_school_boundary_rdd.py</code></a></li>
+<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py"><code>hedonic_model/run_town_premium_models.py</code></a></li>
+</ul>
+<p>In short, the project has moved from raw collection, to geospatial feature construction, to econometric and predictive analyses designed for policy interpretation.</p>
+<h2 id="2-scope">2. Scope</h2>
+<h3 id="21-problem">2.1 Problem</h3>
+<p>The business problem is to quantify the resale-price association with school accessibility while minimizing false attribution from correlated neighborhood features. If this is not done carefully, MND may overestimate the value of “good school” proximity and underweight other drivers such as transport access, unit attributes, and town-level market dynamics.</p>
+<p>The modelling sample used in the current pipeline contains <code>223,550</code> resale transactions (from <code>2017-01</code> to <code>2026-03</code>) across <code>26</code> towns and <code>7</code> flat types, after geospatial matching and filtering to valid HDB polygons. Relative to the raw resale file (<code>226,471</code> rows), <code>2,921</code> rows are excluded due to geocode/matching constraints.</p>
+<h3 id="22-success-criteria">2.2 Success Criteria</h3>
+<p>Success criteria are defined at both business and operational levels.</p>
+<p><strong>Business-facing criteria</strong></p>
+<ol>
+<li>Produce an interpretable estimate of school-proximity effect size that can be translated into approximate SGD premium ranges, rather than only model metrics.</li>
+<li>Identify heterogeneity: whether the estimated premium is consistent across towns or concentrated in specific submarkets.</li>
+<li>Provide evidence for policy use cases such as prioritizing monitoring efforts, stress-testing school-boundary narratives, and communicating uncertainty clearly.</li>
+</ol>
+<p><strong>Operational criteria</strong></p>
+<ol>
+<li>Build a reproducible geospatial feature pipeline from raw source layers to transaction-level model table.</li>
+<li>Keep the pipeline resilient for long-running routing workloads (chunked processing, resumability, append-safe outputs).</li>
+<li>Ensure code traceability by branch and script, with machine-generated outputs for inspection.</li>
+</ol>
+<h3 id="23-assumptions">2.3 Assumptions</h3>
+<p>This report and the current implementation rely on a set of material assumptions.</p>
+<p>First, “good school” is operationalized as the top 59 schools by overall subscription pressure (applicants/vacancies), based on the curated output <code>good_primary_schools.csv</code>. This is a defensible but not unique definition; changing the threshold or ranking criterion will change treatment intensity.</p>
+<p>Second, school influence is approximated through polygon-intersection logic between HDB building polygons and school buffers (1 km and 2 km Euclidean buffers). This treats school exposure as a spatial market signal, not an administrative eligibility guarantee.</p>
+<p>Third, transaction location is represented by geocoded address points matched to HDB polygons rather than exact unit-level coordinates. This introduces measurement error in boundary-near analyses, particularly for local designs.</p>
+<p>Fourth, in the optimized OneMap routing pipeline, OneMap API calls are reserved for nearest-distance fields while threshold-count fields use Euclidean approximations for tractability. This is an intentional engineering trade-off between route realism and quota/runtime constraints.</p>
+<p>Finally, causal interpretation remains conditional. The baseline hedonic and local boundary designs reduce confounding but do not fully eliminate selection effects related to household sorting.</p>
+<h2 id="3-methodology">3. Methodology</h2>
+<h3 id="31-technical-assumptions">3.1 Technical Assumptions</h3>
+<p>The project separates conceptual assumptions (Section 2.3) from technical assumptions that govern implementation.</p>
+<p>Spatial layers are normalized to WGS84 for ingestion and projected to SVY21 (<code>EPSG:3414</code>) where meter-based operations are required. This ensures consistent buffering and distance logic.</p>
+<p>School boundaries are constructed by joining school points to URA master-plan land-use polygons, with de-duplication rules for repeated URA object IDs. From these cleaned polygons, 1 km and 2 km Euclidean buffers are generated.</p>
+<p>For routing features, the OneMap implementation uses candidate pre-filtering by Euclidean radius and nearest-candidate cap (<code>k</code>). The latest optimization keeps OneMap calls for nearest mall/MRT distances while computing 10-minute counts from Euclidean thresholds. Additional deduplication groups repeated origin coordinates to reduce repeated API calls.</p>
+<p>Model-side, resale price is modeled as <code>log(resale_price)</code> to stabilize variance and permit approximate percentage interpretation through <code>exp(beta)-1</code>. Time effects are absorbed through month fixed effects, and location effects through town fixed effects in OLS specifications.</p>
+<h3 id="32-data">3.2 Data</h3>
+<p>The pipeline integrates transactional, geospatial, and amenity datasets.</p>
+<table>
+<thead>
+<tr>
+<th>Data source</th>
+<th>Role in pipeline</th>
+<th>Key outputs</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>HDB resale transactions (<code>2017+</code>)</td>
+<td>Target variable and structural covariates</td>
+<td><code>resale_flats_with_school_buffer_counts_onemap.csv</code></td>
+</tr>
+<tr>
+<td>School location and subscription data</td>
+<td>Good-school definition and school exposure features</td>
+<td><code>good_primary_schools.csv</code>, <code>overall_subscription_rates.csv</code></td>
+</tr>
+<tr>
+<td>URA Master Plan land use</td>
+<td>Spatial entity assignment for school points</td>
+<td><code>primary_school_boundaries*.geojson</code></td>
+</tr>
+<tr>
+<td>HDB existing building polygons</td>
+<td>Polygon matching and exposure transfer</td>
+<td><code>resale_address_points_matched_with_school_counts_onemap.geojson</code></td>
+</tr>
+<tr>
+<td>Mall points and MRT exits</td>
+<td>Accessibility covariates</td>
+<td><code>shopping_centres_points.geojson</code>, <code>mrt_exits_tagged_with_lines.geojson</code></td>
+</tr>
+<tr>
+<td>OneMap routing API</td>
+<td>Walking distance for nearest mall/MRT fields</td>
+<td><code>resale_flats_with_school_buffer_counts_onemap.csv</code></td>
+</tr>
+</tbody>
+</table>
+<p>Current geospatial coverage statistics in the generated artifacts:</p>
+<ul>
+<li>Total schools in subscription table: <code>179</code></li>
+<li>“Good schools” selected: <code>59</code></li>
+<li>Shopping centres mapped: <code>155</code></li>
+<li>MRT exits tagged: <code>597</code></li>
+<li>HDB polygons loaded: <code>13,386</code></li>
+<li>Resale address points matched to HDB polygons: <code>9,568</code></li>
+<li>Unmatched address points: <code>28</code></li>
+</ul>
+<h3 id="33-experimental-design">3.3 Experimental Design</h3>
+<p>The experimental workflow has two layers: feature engineering and modelling.</p>
+<p>At feature-engineering level, the sequence is:</p>
+<ol>
+<li>Build school-boundary entities by joining school points to URA polygons.</li>
+<li>Construct 1 km and 2 km school buffers and classify school tier.</li>
+<li>Match resale address points to HDB polygons.</li>
+<li>For each polygon-linked address, compute school exposure counts (<code>school_count_*</code>, <code>good_school_count_*</code>) by buffer intersection.</li>
+<li>Compute accessibility features (mall/MRT nearest walking distance, nearby amenity counts).</li>
+<li>Export a transaction-level table with all engineered covariates.</li>
+</ol>
+<p>At modelling level (<code>Hedonic-Model</code> branch), three complementary strategies are used:</p>
+<ol>
+<li><strong>Predictive + interpretable hedonic models</strong>: Ridge for predictive stability and OLS for coefficient interpretation.</li>
+<li><strong>Boundary RDD</strong> around the good-school 1 km cutoff: local linear specifications with increasing bandwidths and controls.</li>
+<li><strong>Town-specific regressions</strong>: separate models for heterogeneous premium estimation by town.</li>
+</ol>
+<p>This layered design is deliberate: the hedonic model gives broad association patterns, RDD provides a local validity stress test, and town-level models expose heterogeneity hidden by pooled effects.</p>
+<h2 id="4-findings">4. Findings</h2>
+<h3 id="41-results">4.1 Results</h3>
+<p>The engineered dataset in active use contains <code>223,550</code> resale rows and 27 columns in the OneMap feature table. Key distributional statistics indicate broad exposure variation:</p>
+<ul>
+<li>Share of transactions with at least one good school within 1 km: <code>54.2%</code></li>
+<li>Mean <code>good_school_count_1km</code>: <code>0.61</code></li>
+<li>Mean <code>school_count_1km</code>: <code>3.63</code></li>
+<li>Median nearest mall walking distance: <code>851 m</code></li>
+<li>Median nearest MRT walking distance: <code>681 m</code></li>
+</ul>
+<p>Representative descriptive plots:</p>
+<p><img alt="Town distribution" src="../assets/figures/plot_a_town_distribution_top.png" />
+<img alt="Flat type distribution" src="../assets/figures/plot_b_flat_type_distribution.png" />
+<img alt="Resale price distribution" src="../assets/figures/plot_c1_price_hist_all.png" />
+<img alt="MRT lines within 10-minute walk" src="../assets/figures/plot_d_mrt_lines_distribution.png" /></p>
+<p>From hedonic outputs (<code>hedonic_model/outputs/metrics.json</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Metric</th>
+<th style="text-align: right;">Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Train R² (log scale)</td>
+<td style="text-align: right;">0.909</td>
+</tr>
+<tr>
+<td>Test R² (log scale)</td>
+<td style="text-align: right;">0.915</td>
+</tr>
+<tr>
+<td>Test RMSE (SGD)</td>
+<td style="text-align: right;">58,568.63</td>
+</tr>
+<tr>
+<td>Test MAE (SGD)</td>
+<td style="text-align: right;">43,845.37</td>
+</tr>
+<tr>
+<td>OLS premium estimate for <code>good_school_within_1km</code></td>
+<td style="text-align: right;">-1.62%</td>
+</tr>
+</tbody>
+</table>
+<p>From OLS coefficients:</p>
+<ul>
+<li><code>good_school_within_1km</code>: coefficient <code>-0.0164</code> (p &lt; 1e-20)</li>
+<li><code>good_school_count_1km</code>: coefficient <code>+0.0088</code> (p &lt; 1e-9)</li>
+</ul>
+<p>From nested specification tracing (<code>good_school_sign_trace.csv</code>):</p>
+<ul>
+<li>Raw-only and partially controlled specs show negative coefficients.</li>
+<li>After adding time and town fixed effects, the sign can attenuate or flip.</li>
+<li>Adding full school-count terms reintroduces negative coefficient on the binary indicator, while marginal count effect remains positive.</li>
+</ul>
+<p>From boundary RDD (<code>rdd_results.csv</code>):</p>
+<ul>
+<li>Uncontrolled local jumps are consistently negative and larger in magnitude.</li>
+<li>Controlled specifications near narrow bandwidths are close to zero and often statistically insignificant.</li>
+<li>At wider bandwidths (e.g., 500 m), controlled effects become small negative values, suggesting sensitivity to bandwidth and specification.</li>
+</ul>
+<p>From town-level models (<code>town_premium_results.csv</code>):</p>
+<ul>
+<li>Estimated premium per additional good school within 1 km is heterogeneous:</li>
+<li>strongest positive estimate observed in Geylang (<code>+7.56%</code>)</li>
+<li>strongest negative estimate observed in Serangoon (<code>-8.02%</code>)</li>
+<li>Across 20 town models, 17 are significant at 5%, with both positive and negative signs represented.</li>
+</ul>
+<h3 id="42-discussion">4.2 Discussion</h3>
+<p>Three patterns are important for policy interpretation.</p>
+<p>First, pooled headline effects are unstable across reasonable specifications. A naive interpretation that “being near a good school always increases prices” is not supported once richer controls are introduced. This indicates that simple proximity narratives can confound school effects with neighborhood quality, mature-town effects, and accessibility bundles.</p>
+<p>Second, the town-level heterogeneity is substantial and directionally mixed. The same treatment variable can correspond to positive premiums in some markets and negative premiums in others. This is consistent with differences in local supply constraints, town composition, replacement demand, and co-location of other amenities. For policy, this argues against a single citywide scalar premium.</p>
+<p>Third, local boundary evidence is weaker after controls than in uncontrolled comparisons. This is directionally reassuring: part of the uncontrolled discontinuity likely reflects compositional differences around boundaries rather than pure school-catchment valuation. However, the RDD remains approximate due to address-level rather than exact unit-level geography and pooled school markets.</p>
+<p>A practical implication is that the school variable should be treated as one component of a larger spatial bundle, not as a standalone explanatory lever. In this project, accessibility (MRT/mall and additional walkability variables), structural features, and town-time controls carry substantial explanatory power alongside school-exposure terms.</p>
+<h3 id="43-recommendations">4.3 Recommendations</h3>
+<p>For the next project phase, we recommend prioritizing four items.</p>
+<ol>
+<li>
+<p><strong>Adopt a tiered reporting standard for policy users.</strong> Report pooled estimates together with town-specific ranges and uncertainty intervals. This prevents over-generalization from a single national coefficient.</p>
+</li>
+<li>
+<p><strong>Strengthen identification before policy use.</strong> Continue RDD work with stricter local comparability checks, alternative bandwidth selectors, and placebo boundaries. If feasible, shift from address-point to finer geolocation to reduce measurement error.</p>
+</li>
+<li>
+<p><strong>Expand sensitivity analysis for school definitions.</strong> Re-estimate with alternate “good school” definitions (different top-N thresholds, phase-specific pressure metrics, lag structures) and present robustness envelopes.</p>
+</li>
+<li>
+<p><strong>Operationalize reproducibility for handover.</strong> Keep the chunked OneMap pipeline and branch-separated architecture, but add a single orchestrated runbook and frozen parameter manifests for reproducible policy refreshes.</p>
+</li>
+</ol>
+<p>Given current evidence, the safest policy-facing conclusion is that school proximity is associated with resale prices, but the sign and magnitude are highly context-dependent and model-sensitive. Therefore, policy interpretation should use local and specification-aware estimates rather than a single universal premium.</p>
+              
+            </div>
+          </div><footer>
+    <div class="rst-footer-buttons" role="navigation" aria-label="Footer Navigation">
+        <a href=".." class="btn btn-neutral float-left" title="Home"><span class="icon icon-circle-arrow-left"></span> Previous</a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <!-- Copyright etc -->
+  </div>
+
+  Built with <a href="https://www.mkdocs.org/">MkDocs</a> using a <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>.
+</footer>
+          
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+
+  <div class="rst-versions" role="note" aria-label="Versions">
+  <span class="rst-current-version" data-toggle="rst-current-version">
+    
+        <span>
+          <a href="https://github.com/heehawww/DSA4264_Geospatial_Group6" class="fa fa-github" style="color: #fcfcfc"> GitHub</a>
+        </span>
+    
+    
+      <span><a href=".." style="color: #fcfcfc">&laquo; Previous</a></span>
+    
+    
+  </span>
+</div>
+    <script src="../js/jquery-3.6.0.min.js"></script>
+    <script>var base_url = "..";</script>
+    <script src="../js/theme_extra.js"></script>
+    <script src="../js/theme.js"></script>
+      <script src="../search/main.js"></script>
+    <script>
+        jQuery(function () {
+            SphinxRtdTheme.Navigation.enable(true);
+        });
+    </script>
+
+</body>
+</html>
