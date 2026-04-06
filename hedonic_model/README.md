@@ -46,10 +46,13 @@ It fits two models:
 
 ## Run
 
-From the repository root:
+From the repository root, the recommended predictive run is:
 
 ```bash
-python3 hedonic_model/train_hedonic_model.py
+python3 hedonic_model/train_hedonic_model.py \
+  --feature-spec reduced \
+  --rebalance-floor-area \
+  --output-dir hedonic_model/rebalanced_outputs
 ```
 
 Optional arguments:
@@ -59,13 +62,21 @@ python3 hedonic_model/train_hedonic_model.py \
   --input-csv "walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv" \
   --output-dir hedonic_model/outputs \
   --test-months 12 \
-  --feature-spec reduced
+  --feature-spec reduced \
+  --rebalance-floor-area
 ```
 
 Feature specs:
 
 - `baseline`: original richer predictive feature set
-- `reduced`: pruned feature set that removes the most redundant time, lease, and school indicators for a lower-multicollinearity predictive model
+- `reduced`: pruned feature set that removes the most redundant time, lease, and school indicators for a lower-multicollinearity predictive model. This is the default and preferred predictive spec.
+
+Optional predictive rebalancing:
+
+- `--rebalance-floor-area`: upsamples underrepresented `floor_area_sqm` bands before fitting the Ridge model. This is the preferred predictive configuration.
+- `--weight-floor-area`: upweights underrepresented `floor_area_sqm` bands without duplicating rows
+- `--rebalance-bins`: number of quantile bins used for rebalancing, default `8`
+- `--rebalance-target-fraction`: target quantile of bin size to rebalance toward, default `0.75`
 
 ## Outputs
 
@@ -75,6 +86,8 @@ The script writes to `hedonic_model/outputs/`:
 - `feature_importance_top.csv`
 - `ols_coefficients.csv`
 - `model_summary.txt`
+
+When floor-area rebalancing is enabled, `metrics.json` also records the predictive training row count after rebalancing and the rebalance settings used.
 
 ## Interpretation
 
@@ -146,3 +159,30 @@ Outputs in `hedonic_model/town_outputs/`:
 - `town_premium_results.csv`
 - `town_premium_skipped.csv`
 - `town_premium_results.json`
+
+## Model Benchmarks
+
+To compare feature-reduction and regression variants for the predictive hedonic model:
+
+```bash
+python3 hedonic_model/benchmark_hedonic_variants.py
+```
+
+Outputs in `hedonic_model/benchmark_outputs/`:
+
+- `benchmark_results.csv`
+- `benchmark_results.json`
+- `benchmark_metadata.json`
+
+Benchmarked variants include:
+
+- Ridge with baseline features
+- Ridge with reduced features
+- Ridge with VIF-pruned features
+- Ridge with `f_regression` numeric selection
+- Lasso
+- Elastic Net
+- floor-area-bin rebalanced Ridge
+- floor-area-bin weighted Ridge
+
+Note: classic SMOTE is not used here because this is a regression problem with a continuous target. The benchmark uses a simpler floor-area rebalancing baseline instead.
