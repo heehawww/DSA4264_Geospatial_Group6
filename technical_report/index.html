@@ -70,11 +70,15 @@
     </li>
     <li class="toctree-l3"><a class="reference internal" href="#32-implementation">3.2 Implementation</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#33-experimental-design">3.3 Experimental Design</a>
+    <li class="toctree-l3"><a class="reference internal" href="#33-end-to-end-project-flow">3.3 End-to-End Project Flow</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#34-model-selection-rationale-why-ols-ridge-rdd">3.4 Model Selection Rationale (Why OLS + Ridge + RDD)</a>
+    <li class="toctree-l3"><a class="reference internal" href="#34-model-workflow">3.4 Model Workflow</a>
     </li>
-    <li class="toctree-l3"><a class="reference internal" href="#35-school-location-distribution-map">3.5 School Location Distribution Map</a>
+    <li class="toctree-l3"><a class="reference internal" href="#35-experimental-design">3.5 Experimental Design</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#36-model-selection-rationale-why-ols-ridge-rdd">3.6 Model Selection Rationale (Why OLS + Ridge + RDD)</a>
+    </li>
+    <li class="toctree-l3"><a class="reference internal" href="#37-school-location-distribution-map">3.7 School Location Distribution Map</a>
     </li>
         </ul>
     </li>
@@ -299,7 +303,56 @@
 <li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py"><code>hedonic_model/run_school_boundary_rdd.py</code></a></li>
 <li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py"><code>hedonic_model/run_town_premium_models.py</code></a></li>
 </ul>
-<h3 id="33-experimental-design">3.3 Experimental Design</h3>
+<h3 id="33-end-to-end-project-flow">3.3 End-to-End Project Flow</h3>
+<pre><code class="language-mermaid">flowchart TD
+    A[&quot;Sources&quot;] --&gt; B[&quot;Preprocess&quot;]
+    B --&gt; C[&quot;Features&quot;]
+    C --&gt; D[&quot;Modeling&quot;]
+    D --&gt; E[&quot;Artifacts&quot;]
+    E --&gt; F[&quot;FastAPI&quot;]
+    F --&gt; G[&quot;LLM Layer&quot;]
+    G --&gt; H[&quot;Policy User&quot;]
+    E --&gt; I[&quot;MkDocs&quot;]
+
+    classDef source fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
+    classDef prep fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
+    classDef app fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+    classDef output fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
+
+    class A source;
+    class B,C prep;
+    class D,E model;
+    class F,G,H app;
+    class I output;
+</code></pre>
+<h3 id="34-model-workflow">3.4 Model Workflow</h3>
+<pre><code class="language-mermaid">flowchart TD
+    A[&quot;Feature Data&quot;] --&gt; B[&quot;Train/Test&quot;]
+    B --&gt; C[&quot;Ridge&quot;]
+    B --&gt; D[&quot;OLS&quot;]
+    B --&gt; E[&quot;RDD&quot;]
+    B --&gt; F[&quot;Town Premium&quot;]
+    C --&gt; G[&quot;metrics + pipeline&quot;]
+    D --&gt; H[&quot;OLS table&quot;]
+    E --&gt; I[&quot;RDD tables&quot;]
+    F --&gt; J[&quot;Town tables&quot;]
+    G --&gt; K[&quot;API model/predict&quot;]
+    H --&gt; K
+    I --&gt; L[&quot;API rdd/*&quot;]
+    J --&gt; M[&quot;API town-premiums/*&quot;]
+
+    classDef data fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
+    classDef train fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
+    classDef api fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+
+    class A data;
+    class B train;
+    class C,D,E,F,G,H,I,J model;
+    class K,L,M api;
+</code></pre>
+<h3 id="35-experimental-design">3.5 Experimental Design</h3>
 <p>The experimental workflow has two layers: feature engineering and modelling.</p>
 <p>At feature-engineering level, the sequence is:</p>
 <ol>
@@ -317,7 +370,7 @@
 <li>Town-specific regressions: separate models for heterogeneous premium estimation by town.</li>
 </ol>
 <p>This layered design is deliberate: the hedonic model gives broad association patterns, RDD provides a local validity stress test, and town-level models expose heterogeneity that pooled coefficients can hide.</p>
-<h3 id="34-model-selection-rationale-why-ols-ridge-rdd">3.4 Model Selection Rationale (Why OLS + Ridge + RDD)</h3>
+<h3 id="36-model-selection-rationale-why-ols-ridge-rdd">3.6 Model Selection Rationale (Why OLS + Ridge + RDD)</h3>
 <p>The modelling stack combines methods with complementary strengths.</p>
 <p>Ridge regression is used as the primary predictive model because the feature space includes many correlated engineered covariates and one-hot encoded fixed effects. L2 regularization stabilizes coefficients under multicollinearity and improves out-of-sample generalization.</p>
 <p>OLS is retained in parallel for coefficient interpretability. It provides directly readable terms for hypothesis discussion (for example, <code>good_school_within_1km</code> and <code>good_school_count_1km</code>) and supports fixed-effect specifications that are useful for decomposition and diagnostics.</p>
@@ -350,7 +403,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="35-school-location-distribution-map">3.5 School Location Distribution Map</h3>
+<h3 id="37-school-location-distribution-map">3.7 School Location Distribution Map</h3>
 <p>To support visual validation of school-location coverage, we provide a static split map (green points = Good schools, blue points = Not good schools):</p>
 <p><img alt="School location distribution map" src="../assets/figures/school_location_distribution_map_static.png" /></p>
 <p>The map shows 179 school points across the island (<code>53</code> good, <code>126</code> not good in the joined point layer), with denser clusters in major residential belts. This is used as a QC check before downstream buffer and distance feature generation.</p>
@@ -511,28 +564,6 @@ Median prices generally rise with more nearby rail-line options; high-line-count
 <h2 id="6-system-architecture">6. System Architecture</h2>
 <h3 id="61-overview">6.1 Overview</h3>
 <p>The intended architecture has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer. The backend (<code>api</code> branch) handles retrieval, filtering, and inference; artifacts are precomputed offline and loaded at runtime.</p>
-<pre><code class="language-mermaid">flowchart TD
-    A[&quot;Data Sources&quot;] --&gt; B[&quot;Preprocessing&lt;br/&gt;primary_boundaries&quot;]
-    B --&gt; C[&quot;Feature Table&quot;]
-    C --&gt; D[&quot;Modeling&lt;br/&gt;hedonic_model&quot;]
-    D --&gt; E[&quot;Artifacts&lt;br/&gt;CSV/JSON/PKL&quot;]
-    E --&gt; F[&quot;FastAPI Backend&lt;br/&gt;api branch&quot;]
-    F --&gt; G[&quot;LLM Query Layer&quot;]
-    G --&gt; H[&quot;Policy User&quot;]
-    E --&gt; I[&quot;MkDocs Report&quot;]
-
-    classDef source fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef prep fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef app fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-    classDef output fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
-
-    class A source;
-    class B,C prep;
-    class D,E model;
-    class F,G,H app;
-    class I output;
-</code></pre>
 <h3 id="62-backend-design">6.2 Backend Design</h3>
 <p>Endpoints are grouped by function to separate observed data from model outputs.</p>
 <p>Core model endpoints:</p>
@@ -559,31 +590,6 @@ Median prices generally rise with more nearby rail-line options; high-line-count
 </ul>
 <h3 id="63-model-serving">6.3 Model Serving</h3>
 <p>Models are trained offline and served from serialized artifacts (<code>ridge_pipeline.pkl</code>, <code>metrics.json</code>, <code>ols_coefficients.csv</code>, and RDD/town-premium tables under <code>data/</code> on the <code>api</code> branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.</p>
-<pre><code class="language-mermaid">flowchart TD
-    A[&quot;Engineered Data&quot;] --&gt; B[&quot;Train/Test Split&quot;]
-    B --&gt; C[&quot;Ridge&lt;br/&gt;prediction&quot;]
-    B --&gt; D[&quot;OLS&lt;br/&gt;coefficients&quot;]
-    B --&gt; E[&quot;RDD&quot;]
-    B --&gt; F[&quot;Town Premiums&quot;]
-    C --&gt; G[&quot;metrics.json&lt;br/&gt;ridge_pipeline.pkl&quot;]
-    D --&gt; H[&quot;ols_coefficients.csv&quot;]
-    E --&gt; I[&quot;school_specific_rdd_*.csv&quot;]
-    F --&gt; J[&quot;town_premium_*.csv&quot;]
-    G --&gt; K[&quot;API /predict + /model/*&quot;]
-    H --&gt; K
-    I --&gt; L[&quot;API /rdd/*&quot;]
-    J --&gt; M[&quot;API /town-premiums/*&quot;]
-
-    classDef data fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef train fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef api fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-
-    class A data;
-    class B train;
-    class C,D,E,F,G,H,I,J model;
-    class K,L,M api;
-</code></pre>
 <h3 id="64-llm-interface">6.4 LLM Interface</h3>
 <p>Natural-language queries are mapped to endpoint intents and routed to backend/model outputs.
 Flow: <code>User -&gt; LLM/parser -&gt; backend -&gt; model/artifact -&gt; response</code>.</p>
@@ -652,6 +658,8 @@ Flow: <code>User -&gt; LLM/parser -&gt; backend -&gt; model/artifact -&gt; respo
     <script>var base_url = "..";</script>
     <script src="../js/theme_extra.js"></script>
     <script src="../js/theme.js"></script>
+      <script src="https://unpkg.com/mermaid@10/dist/mermaid.min.js"></script>
+      <script src="../javascripts/mermaid-init.js"></script>
       <script src="../search/main.js"></script>
     <script>
         jQuery(function () {
