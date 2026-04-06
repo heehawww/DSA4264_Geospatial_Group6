@@ -169,6 +169,10 @@ Method alternatives were considered but not prioritized in this phase:
 | Full causal design only (no predictive model) | Better identification focus but loses practical forecasting and residual diagnostics benefits |
 | One universal treatment premium | Empirically inconsistent with town-level heterogeneity observed in outputs |
 
+### 3.7 Deployment
+
+Deployment has two layers: MkDocs + GitHub Pages for the report, and a FastAPI service on the `api` branch (`/resales`, `/ols`, `/model`, `/rdd`, `/premiums`, `/predict`) using `data/` artifacts for API-backed LLM responses.
+
 ## 4. Findings
 
 ### 4.1 Results
@@ -205,14 +209,24 @@ From hedonic outputs (`hedonic_model/outputs/metrics.json`):
 | Test MAE (SGD) | 43,845.37 |
 | OLS premium estimate for `good_school_within_1km` | -1.62% |
 
-`Test R2 = 0.915` means that on the holdout period, the model explains about 91.5% of the variation in `log(resale_price)` across transactions, after accounting for the full feature set. It indicates strong predictive fit for out-of-time data, but it is not by itself evidence of causal effect.
+Model analysis protocol in the hedonic run:
 
-SMOTE was not used in this project pipeline. Code inspection shows no `SMOTE`/`imblearn` usage in tracked scripts, and the modelling task is regression rather than class-imbalance classification.
+- Temporal train-test split (no random shuffle): last 12 months held out.
+- Training rows `200,744` (`89.8%`), test rows `22,806` (`10.2%`).
+- Cross-validation was not used in this baseline; Ridge used fixed `alpha=1.0`.
+- ANOVA-style global variance test from OLS: `F = 7887`, `Prob(F) = 0.00`, so regressors are jointly significant.
 
-From OLS coefficients:
+`Test R2 = 0.915` means about 91.5% of holdout variation in `log(resale_price)` is explained by the model; this is predictive fit, not causal proof. SMOTE was not used (`imblearn` not used; task is regression).
 
-- `good_school_within_1km`: coefficient `-0.0164` (p < 1e-20)
-- `good_school_count_1km`: coefficient `+0.0088` (p < 1e-9)
+Key significant variables from OLS:
+
+- `floor_area_sqm`: `+0.00834` (p < 1e-40)
+- `storey_mid`: `+0.00742` (p < 1e-40)
+- `ln_nearest_mrt_walking_distance_m`: `-0.02557` (p < 1e-40)
+- `mrt_unique_lines_within_10min_walk`: `+0.03874` (p < 1e-40)
+- `good_school_within_1km`: `-0.0164` (p < 1e-20)
+- `good_school_count_1km`: `+0.0088` (p < 1e-9)
+- `pscore` note: not included as a standalone continuous regressor in this baseline; it is used indirectly via good-school tier/count construction.
 
 Using the sample median resale price (about SGD 495k), a `-1.62%` pooled premium corresponds to roughly `-SGD 8.0k`, while a `+0.88%` marginal premium per additional good school within 1 km corresponds to about `+SGD 4.4k`. This sign inconsistency implies policy teams should not rely on one pooled number for pricing-impact decisions.
 
@@ -228,9 +242,7 @@ Short consolidation table from boundary RDD (`hedonic_model/rdd_outputs/rdd_resu
 |---|---:|---:|---:|---:|
 | Uncontrolled | 100 | 32,185 | -1.71 | 0.0289 |
 | Controlled | 100 | 32,185 | +0.34 | 0.1216 |
-| School fixed effects | 300 | 88,894 | -0.31 | 0.0192 |
-| Controlled | 500 | 130,610 | -0.40 | 0.00017 |
-| Uncontrolled | 500 | 130,610 | -5.17 | <1e-40 |
+| School fixed effects | 100 | 32,185 | +0.24 | 0.2558 |
 
 Meaning of the RDD specifications:
 
@@ -238,7 +250,7 @@ Meaning of the RDD specifications:
 - **Controlled**: adds structural and market controls (for example, floor area, lease variables, flat type/model, town and month effects), reducing omitted-variable bias around the cutoff.
 - **School fixed effects**: controlled model plus school-specific fixed effects, so identification comes from within-school boundary variation rather than pooled cross-school level differences.
 
-This table highlights that effect size and significance are highly specification-sensitive. Uncontrolled local contrasts are much more negative than controlled variants, consistent with non-trivial local confounding.
+Effect size and significance are strongly specification-sensitive, with uncontrolled estimates markedly more negative than controlled variants.
 
 From town-level models (`town_premium_results.csv`):
 
@@ -247,17 +259,19 @@ From town-level models (`town_premium_results.csv`):
   - strongest negative estimate observed in Serangoon (`-8.02%`)
 - Across 20 town models, 17 are significant at 5%, with both positive and negative signs represented.
 
+Static planning-area sign map (`good_school_within_1km`; green positive, red negative):
+
+![Planning-area sign map for good school within 1km](assets/figures/planning_area_good_school_within_1km_sign_static.png)
+
+Short read of the map: signs are mixed islandwide (`10` positive, `15` negative, `3` near-zero), so the school effect is not uniformly positive. The core areas mapped from `CENTRAL AREA` (Downtown Core, Rochor, Outram) are negative in this run, so the pattern is not simply "more central = more positive". The map shows sign, not counts, but positive-sign towns also have higher average `good_school_count_1km` (`0.84` vs `0.60`); this remains associative, not causal.
+
+Coefficient table: `docs/assets/data/town_good_school_within_1km_sign_summary.csv`.
+
 ### 4.2 Discussion
 
-Three patterns are important for interpreting results correctly against the business problem.
+Pooled headline effects are unstable across specifications, so "near a good school always raises prices" is not supported once richer controls are added. Town-level heterogeneity is also strong and mixed in sign, which argues against a single citywide premium.
 
-First, pooled headline effects are unstable across reasonable specifications. A naive interpretation that "being near a good school always increases prices" is not supported once richer controls are introduced. This indicates that simple proximity narratives can confound school effects with neighborhood quality, mature-town effects, and accessibility bundles.
-
-Second, town-level heterogeneity is substantial and directionally mixed. The same treatment variable can correspond to positive premiums in some markets and negative premiums in others. This is consistent with differences in local supply constraints, town composition, replacement demand, and co-location of amenities. For policy, this argues against a single citywide scalar premium.
-
-Third, local boundary evidence is weaker after controls than in uncontrolled comparisons. This is directionally reassuring: part of the uncontrolled discontinuity likely reflects compositional differences around boundaries rather than pure school-catchment valuation. However, the RDD remains approximate due to address-level rather than exact unit-level geography and pooled school markets.
-
-A practical implication for MND is that school variables should be treated as one component of a broader spatial bundle when monitoring resale-price pressure. In this project, accessibility (MRT and mall, plus additional walkability variables), structural features, and town-time controls carry substantial explanatory power alongside school-exposure terms.
+Local boundary evidence weakens after controls versus uncontrolled comparisons, suggesting part of the raw discontinuity reflects local composition differences. School variables should therefore be interpreted as one component of a broader spatial bundle with accessibility, structural attributes, and time-location effects.
 
 ### 4.3 Recommendations
 
