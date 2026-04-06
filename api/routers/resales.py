@@ -18,6 +18,7 @@ SUPPORTED_GROUP_BY = [
     "flat_model",
     "month",
     "storey_range",
+    "street_name",
 ]
 
 
@@ -45,14 +46,6 @@ def _apply_common_resale_filters(
     max_lease_commence_date: int | None = None,
     min_resale_price: float | None = None,
     max_resale_price: float | None = None,
-    min_school_count_1km: float | None = None,
-    max_school_count_1km: float | None = None,
-    min_good_school_count_1km: float | None = None,
-    max_good_school_count_1km: float | None = None,
-    min_school_count_2km: float | None = None,
-    max_school_count_2km: float | None = None,
-    min_good_school_count_2km: float | None = None,
-    max_good_school_count_2km: float | None = None,
 ) -> pd.DataFrame:
     if town and "town" in df.columns:
         wanted = {value.upper() for value in town}
@@ -84,10 +77,6 @@ def _apply_common_resale_filters(
         ("floor_area_sqm", min_floor_area_sqm, max_floor_area_sqm),
         ("lease_commence_date", min_lease_commence_date, max_lease_commence_date),
         ("resale_price", min_resale_price, max_resale_price),
-        ("school_count_1km", min_school_count_1km, max_school_count_1km),
-        ("good_school_count_1km", min_good_school_count_1km, max_good_school_count_1km),
-        ("school_count_2km", min_school_count_2km, max_school_count_2km),
-        ("good_school_count_2km", min_good_school_count_2km, max_good_school_count_2km),
     ]
     for column, minimum, maximum in numeric_ranges:
         if column not in df.columns:
@@ -129,14 +118,6 @@ def get_resales_schema(store: DataStore = Depends(get_store)) -> ResalesSchemaRe
                 "max_lease_commence_date",
                 "min_resale_price",
                 "max_resale_price",
-                "min_school_count_1km",
-                "max_school_count_1km",
-                "min_good_school_count_1km",
-                "max_good_school_count_1km",
-                "min_school_count_2km",
-                "max_school_count_2km",
-                "min_good_school_count_2km",
-                "max_good_school_count_2km",
             ],
         },
         "supported_group_by": SUPPORTED_GROUP_BY,
@@ -165,14 +146,6 @@ def get_raw_resales(
     max_lease_commence_date: int | None = Query(default=None),
     min_resale_price: float | None = Query(default=None),
     max_resale_price: float | None = Query(default=None),
-    min_school_count_1km: float | None = Query(default=None),
-    max_school_count_1km: float | None = Query(default=None),
-    min_good_school_count_1km: float | None = Query(default=None),
-    max_good_school_count_1km: float | None = Query(default=None),
-    min_school_count_2km: float | None = Query(default=None),
-    max_school_count_2km: float | None = Query(default=None),
-    min_good_school_count_2km: float | None = Query(default=None),
-    max_good_school_count_2km: float | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=1000),
     store: DataStore = Depends(get_store),
 ) -> RawResalesResponse:
@@ -194,14 +167,6 @@ def get_raw_resales(
         max_lease_commence_date=max_lease_commence_date,
         min_resale_price=min_resale_price,
         max_resale_price=max_resale_price,
-        min_school_count_1km=min_school_count_1km,
-        max_school_count_1km=max_school_count_1km,
-        min_good_school_count_1km=min_good_school_count_1km,
-        max_good_school_count_1km=max_good_school_count_1km,
-        min_school_count_2km=min_school_count_2km,
-        max_school_count_2km=max_school_count_2km,
-        min_good_school_count_2km=min_good_school_count_2km,
-        max_good_school_count_2km=max_good_school_count_2km,
     )
 
     df = df.head(limit).replace({np.nan: None})
@@ -235,14 +200,6 @@ def get_resales_summary(
     max_lease_commence_date: int | None = Query(default=None),
     min_resale_price: float | None = Query(default=None),
     max_resale_price: float | None = Query(default=None),
-    min_school_count_1km: float | None = Query(default=None),
-    max_school_count_1km: float | None = Query(default=None),
-    min_good_school_count_1km: float | None = Query(default=None),
-    max_good_school_count_1km: float | None = Query(default=None),
-    min_school_count_2km: float | None = Query(default=None),
-    max_school_count_2km: float | None = Query(default=None),
-    min_good_school_count_2km: float | None = Query(default=None),
-    max_good_school_count_2km: float | None = Query(default=None),
     group_by: str | None = Query(default=None, description="town, flat_type, flat_model, month, or storey_range"),
     store: DataStore = Depends(get_store),
 ) -> ResalesSummaryResponse:
@@ -263,14 +220,6 @@ def get_resales_summary(
         max_lease_commence_date=max_lease_commence_date,
         min_resale_price=min_resale_price,
         max_resale_price=max_resale_price,
-        min_school_count_1km=min_school_count_1km,
-        max_school_count_1km=max_school_count_1km,
-        min_good_school_count_1km=min_good_school_count_1km,
-        max_good_school_count_1km=max_good_school_count_1km,
-        min_school_count_2km=min_school_count_2km,
-        max_school_count_2km=max_school_count_2km,
-        min_good_school_count_2km=min_good_school_count_2km,
-        max_good_school_count_2km=max_good_school_count_2km,
     )
 
     if "resale_price" not in df.columns:
@@ -333,14 +282,6 @@ def get_resales_summary(
             "max_lease_commence_date": max_lease_commence_date,
             "min_resale_price": min_resale_price,
             "max_resale_price": max_resale_price,
-            "min_school_count_1km": min_school_count_1km,
-            "max_school_count_1km": max_school_count_1km,
-            "min_good_school_count_1km": min_good_school_count_1km,
-            "max_good_school_count_1km": max_good_school_count_1km,
-            "min_school_count_2km": min_school_count_2km,
-            "max_school_count_2km": max_school_count_2km,
-            "min_good_school_count_2km": min_good_school_count_2km,
-            "max_good_school_count_2km": max_good_school_count_2km,
             "group_by": group_by,
         },
         "summary": summary,

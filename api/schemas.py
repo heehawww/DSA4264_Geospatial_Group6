@@ -38,34 +38,31 @@ class HealthResponse(BaseModel):
     status: str
 
 
-class MessageResponse(BaseModel):
-    message: str
-
-
 class MetadataResponse(BaseModel):
     data_dir: str
     feature_dataset_path: str
     feature_dataset_rows: int
-    ols_terms: int
-    rdd_rows: int
-    premium_rows: int
     raw_resale_dataset_status: str
     raw_resale_dataset_path: str | None
     raw_resale_dataset_rows: int | None
-    raw_resale_dataset_note: str
+    model_metrics_rows: int
+    feature_importance_rows: int
+    ols_terms: int
+    rdd_result_rows: int
+    rdd_coefficient_rows: int
+    rdd_skipped_rows: int
+    rdd_group_ttest_rows: int
+    town_premium_rows: int
+    town_premium_skipped_rows: int
+    sign_trace_rows: int
+    benchmark_rows: int
     model_metrics: dict[str, Any]
     rdd_summary: dict[str, Any]
-    premium_summary: dict[str, Any]
+    benchmark_metadata: dict[str, Any]
 
 
 class TabularResponse(BaseModel):
     count: int
-    filters: dict[str, Any]
-    rows: list[dict[str, Any]]
-
-
-class PremiumListResponse(BaseModel):
-    summary: dict[str, Any]
     filters: dict[str, Any]
     rows: list[dict[str, Any]]
 

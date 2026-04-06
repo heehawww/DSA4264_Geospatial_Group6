@@ -1,0 +1,28 @@
+boundary_school_name,school_group,bandwidth_m,sample_size,inside_n,outside_n,reason
+ANGLO-CHINESE SCHOOL (JUNIOR),good,100,136,35,101,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (JUNIOR),good,200,385,35,350,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (JUNIOR),good,300,532,35,497,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (JUNIOR),good,500,675,35,640,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (PRIMARY),good,100,0,0,0,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (PRIMARY),good,200,0,0,0,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (PRIMARY),good,300,106,0,106,insufficient_boundary_sample
+ANGLO-CHINESE SCHOOL (PRIMARY),good,500,304,0,304,insufficient_boundary_sample
+CEDAR PRIMARY SCHOOL,non_good,100,240,213,27,insufficient_boundary_sample
+CHIJ (KATONG) PRIMARY,non_good,100,0,0,0,insufficient_boundary_sample
+CHIJ (KATONG) PRIMARY,non_good,200,25,25,0,insufficient_boundary_sample
+CHIJ (KATONG) PRIMARY,non_good,300,61,61,0,insufficient_boundary_sample
+CHIJ (KATONG) PRIMARY,non_good,500,314,280,34,insufficient_boundary_sample
+PARK VIEW PRIMARY SCHOOL,non_good,100,44,44,0,insufficient_boundary_sample
+PEI HWA PRESBYTERIAN PRIMARY SCHOOL,good,100,0,0,0,insufficient_boundary_sample
+PEI HWA PRESBYTERIAN PRIMARY SCHOOL,good,200,0,0,0,insufficient_boundary_sample
+PEI HWA PRESBYTERIAN PRIMARY SCHOOL,good,300,0,0,0,insufficient_boundary_sample
+PEI HWA PRESBYTERIAN PRIMARY SCHOOL,good,500,22,0,22,insufficient_boundary_sample
+PEI TONG PRIMARY SCHOOL,non_good,100,120,74,46,insufficient_boundary_sample
+RAFFLES GIRLS' PRIMARY SCHOOL,good,100,0,0,0,insufficient_boundary_sample
+RAFFLES GIRLS' PRIMARY SCHOOL,good,200,49,0,49,insufficient_boundary_sample
+RAFFLES GIRLS' PRIMARY SCHOOL,good,300,86,0,86,insufficient_boundary_sample
+RAFFLES GIRLS' PRIMARY SCHOOL,good,500,139,0,139,insufficient_boundary_sample
+TAO NAN SCHOOL,good,100,0,0,0,insufficient_boundary_sample
+TAO NAN SCHOOL,good,200,0,0,0,insufficient_boundary_sample
+TAO NAN SCHOOL,good,300,44,44,0,insufficient_boundary_sample
+TAO NAN SCHOOL,good,500,165,165,0,insufficient_boundary_sample

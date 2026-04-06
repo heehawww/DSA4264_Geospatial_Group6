@@ -1,0 +1,22 @@
+{
+  "note": "Classic SMOTE is not included because the task is regression with a continuous target. A floor-area-bin rebalancing baseline is used instead.",
+  "vif_pruned_features": [
+    "lease_age_years",
+    "storey_mid",
+    "sale_month",
+    "months_since_start",
+    "malls_within_10min_walk",
+    "mrt_unique_lines_within_10min_walk",
+    "school_count_1km",
+    "good_school_count_1km",
+    "good_school_count_2km",
+    "bus_stops_within_5min_walk",
+    "hawker_centres_within_5min_walk",
+    "supermarkets_within_10min_walk",
+    "parks_within_5min_walk",
+    "pcns_within_5min_walk"
+  ],
+  "anova_k": 12,
+  "train_rows": 200744,
+  "test_rows": 22806
+}
