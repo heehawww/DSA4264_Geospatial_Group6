@@ -2,55 +2,29 @@
 
 ## 1. Context
 
-Housing demand in Singapore is strongly shaped by access to public amenities, and school access has become a recurring policy and public concern. In practice, households often treat proximity to competitive primary schools as a key criterion when selecting resale flats. From a Ministry of National Development (MND) perspective, this creates a practical policy question: how much of observed resale price variation is associated with school-access effects, and how much is explained by other structural and accessibility factors.
+The Ministry of National Development (MND) is responsible for land-use planning and for ensuring affordable, accessible public housing. In recent years, HDB resale prices have faced upward pressure from supply-demand conditions and location-based preferences. A major preference channel is proximity to desirable primary schools: under MOE admission rules, distance bands matter and Singaporean households within 1km will receive priority in selection compared to others.
 
-This project was initiated to support that question with an auditable, data-driven workflow. The objective is not only predictive performance, but also policy interpretability: if we quantify a school-access premium, we need to understand when it appears, where it appears, and whether it remains after controlling for confounders.
-
-The implementation evolved across branches in the repository:
-
-| Branch | Role in project |
-|---|---|
-| [`main`](https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/main) / `webscraper` | Initial MOE school-data scraping setup |
-| [`Web_Crawler`](https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Web_Crawler) | Crawler refinements for school-vacancy and balloting extraction |
-| [`Data-Preprocessing`](https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Data-Preprocessing) | Geospatial integration and feature engineering pipeline |
-| [`Hedonic-Model`](https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Hedonic-Model) | Hedonic regression, boundary RDD, and town-level heterogeneous-effect analysis |
-
-Content under `main`/`webscraper` is limited to the legacy crawler module (`Webscrapper/primaryschoolscrap/...`) and an early `schools.csv` snapshot. It serves primarily as project lineage for raw school-vacancy extraction, while the active production preprocessing and modelling workflows are maintained in `Data-Preprocessing` and `Hedonic-Model`.
-
-Within `Data-Preprocessing`, the core geospatial workflow is implemented in:
-
-- [`primary_boundaries/join_primary_schools_to_ura_landuse.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/join_primary_schools_to_ura_landuse.py)
-- [`primary_boundaries/build_resale_flat_school_dataset_onemaps.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/build_resale_flat_school_dataset_onemaps.py)
-
-Within `Hedonic-Model`, model estimation is implemented in:
-
-- [`hedonic_model/train_hedonic_model.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/train_hedonic_model.py)
-- [`hedonic_model/run_school_boundary_rdd.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py)
-- [`hedonic_model/run_town_premium_models.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py)
-
-In short, the project has moved from raw collection, to geospatial feature construction, to econometric and predictive analyses designed for policy interpretation.
+This raises the question: "Does proximity to "good" primary schools result in a measurable resale premium?" The project will emphasizes both predictive accuracy and interpretation quality for policy use, taking into consideration flat attributes, transport access, and neighborhood amenities. THe project will aim to create actionable insights for policy design within the MND to address these concerns should there be a premium associated with distance.
 
 ## 2. Scope
 
 ### 2.1 Problem
 
-The business problem is to quantify the resale-price association with school accessibility while minimizing false attribution from correlated neighborhood features. If this is not done carefully, MND may overestimate the value of "good school" proximity and underweight other drivers such as transport access, unit attributes, and town-level market dynamics.
-
-The modelling sample used in the current pipeline contains `223,550` resale transactions (from `2017-01` to `2026-03`) across `26` towns and `7` flat types, after geospatial matching and filtering to valid HDB polygons. Relative to the raw resale file (`226,471` rows), `2,921` rows are excluded due to geocode and polygon-matching constraints.
+MND needs an effect estimate that can be compared across specifications and geographies to avoid attributing general location premiums to school access alone. The product aims to address problems associated with accessibility: non-technical officers should be able to query our model output through a natural-language interface without writing code.
 
 ### 2.2 Success Criteria
 
 Success criteria are defined at both business and operational levels.
 
-Business-facing criteria are to produce interpretable effect sizes in SGD terms, reveal where school effects are heterogeneous instead of assuming a single national premium, and provide evidence that can support policy discussions on housing affordability, neighborhood demand pressure, and planning trade-offs.
+Business-facing criteria is to produce interpretable effect sizes, revealing where school effects are heterogeneous instead of assuming a single national premium, and provide evidence that can support policy discussions on housing affordability, neighborhood demand pressure, and planning trade-offs.
 
-Operational criteria are to build a reproducible geospatial feature pipeline from raw source layers to a transaction-level model table, keep the routing workflow stable for long runs, and preserve traceability of design choices across scripts and branches.
+Operational criteria is to build a reproducible geospatial feature pipeline from raw source layers to a transaction-level model table, preserving traceability of design choices across scripts and branches.
 
 ### 2.3 Assumptions
 
 This report and the current implementation rely on a set of material assumptions.
 
-First, "good school" is operationalized as the top 59 schools by overall subscription pressure (applicants/vacancies), based on `good_primary_schools.csv`. This is a defensible but not unique definition. If the threshold or ranking basis changes, treatment intensity changes.
+First, "good school" is operationalized as the top 59 schools by overall subscription pressure (applicants/vacancies), as well as other factors such as programs offered such as GEP and SAP. Upon collection of this data, our group adds in person bias in what we percieve as a good school, adding into the data set. While it produces a unique definition of a good school, it relys on both a systematic as well as a perceptive methodology in determining what a good school is.
 
 Second, school influence is approximated through polygon-intersection logic between HDB building polygons and school buffers (1 km and 2 km Euclidean buffers). This represents spatial market signal, not guaranteed administrative eligibility.
 
@@ -71,6 +45,9 @@ Although the report is written for data scientists, the project methods were sel
 | Policy and planning analyst | Are effects heterogeneous by local market? | `town_outputs/town_premium_results.csv` |
 | Data engineering maintainer | Can the pipeline be rerun safely at scale? | `build_resale_flat_school_dataset_onemaps.py` chunked and append-safe pipeline |
 
+
+
+
 ## 3. Methodology
 
 ### 3.1 Technical Assumptions
@@ -85,9 +62,30 @@ For routing features, the OneMap implementation uses candidate pre-filtering by 
 
 Model-side, resale price is modeled as `log(resale_price)` to stabilize variance and permit approximate percentage interpretation through `exp(beta)-1`. Time effects are absorbed through month fixed effects and location effects through town fixed effects in OLS specifications.
 
-### 3.2 Data
+### 3.2 Implementation
+The implementation evolved across branches in the repository:
+
+| Branch | Role in project |
+|---|---|
+| [`Data-Preprocessing`](https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Data-Preprocessing) | Geospatial integration and feature engineering pipeline |
+| [`Hedonic-Model`](https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Hedonic-Model) | Hedonic regression, boundary RDD, and town-level heterogeneous-effect analysis |
+
+Within `Data-Preprocessing`, the core geospatial workflow is implemented in:
+
+- [`primary_boundaries/join_primary_schools_to_ura_landuse.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/join_primary_schools_to_ura_landuse.py)
+- [`primary_boundaries/build_resale_flat_school_dataset_onemaps.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/build_resale_flat_school_dataset_onemaps.py)
+
+Within `Hedonic-Model`, model estimation is implemented in:
+
+- [`hedonic_model/train_hedonic_model.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/train_hedonic_model.py)
+- [`hedonic_model/run_school_boundary_rdd.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py)
+- [`hedonic_model/run_town_premium_models.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py)
+
+### 3.3 Data
 
 The pipeline integrates transactional, geospatial, and amenity datasets.
+
+Data governance note: by design, raw source data should be re-pulled from upstream providers (for example Kaggle, data.gov.sg, and scraping pipelines) rather than treated as permanent versioned assets in the code repository.
 
 | Data source | Role in pipeline | Main path in repo |
 |---|---|---|
@@ -108,7 +106,7 @@ Current coverage statistics in generated artifacts:
 - Resale address points matched to HDB polygons: `9,568`
 - Unmatched address points: `28`
 
-### 3.3 Required APIs and External Services
+### 3.4 Required APIs and External Services
 
 Two external services are used in this project workflow.
 
@@ -116,7 +114,7 @@ The first is the OneMap routing API (`https://www.onemap.gov.sg/api/public/routi
 
 The second is Kaggle dataset access (`kagglehub`) for selected enrichment sources used in preprocessing scripts (for example, shopping-centre coordinate seeds and MRT metadata tables). These scripts require local Kaggle authentication setup when rerunning data pulls.
 
-### 3.4 School Location Distribution Map
+### 3.5 School Location Distribution Map
 
 To support quick visual validation of coverage, we render the school point layer on an interactive Folium map:
 
@@ -127,7 +125,7 @@ If your browser blocks the iframe in local preview, open this direct link:
 
 The map shows 179 school points distributed across the island, with visible concentration in dense residential planning areas and lower density in industrial or low-population zones. This visual check is useful for detecting coordinate errors (for example, points plotted offshore) before downstream buffer and distance calculations are run.
 
-### 3.5 Experimental Design
+### 3.6 Experimental Design
 
 The experimental workflow has two layers: feature engineering and modelling.
 
@@ -148,7 +146,7 @@ At modelling level (`Hedonic-Model` branch), three complementary strategies are 
 
 This layered design is deliberate: the hedonic model gives broad association patterns, RDD provides a local validity stress test, and town-level models expose heterogeneity that pooled coefficients can hide.
 
-### 3.6 Model Selection Rationale (Why OLS + Ridge + RDD)
+### 3.7 Model Selection Rationale (Why OLS + Ridge + RDD)
 
 The modelling stack combines methods with complementary strengths.
 
@@ -169,7 +167,7 @@ Method alternatives were considered but not prioritized in this phase:
 | Full causal design only (no predictive model) | Better identification focus but loses practical forecasting and residual diagnostics benefits |
 | One universal treatment premium | Empirically inconsistent with town-level heterogeneity observed in outputs |
 
-### 3.7 Deployment
+### 3.8 Deployment
 
 Deployment has two layers: MkDocs + GitHub Pages for the report, and a FastAPI service on the `api` branch (`/resales`, `/ols`, `/model`, `/rdd`, `/premiums`, `/predict`) using `data/` artifacts for API-backed LLM responses.
 
