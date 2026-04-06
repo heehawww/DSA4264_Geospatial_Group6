@@ -2,35 +2,29 @@
 
 ## 1. Context
 
-The Ministry of National Development (MND) is responsible for land-use planning and for ensuring affordable, accessible public housing. In recent years, HDB resale prices have faced upward pressure from supply-demand conditions and location-based preferences. A major preference channel is proximity to desirable primary schools: under MOE admission rules, distance bands matter and Singaporean households within 1km will receive priority in selection compared to others.
+MND is responsible for land-use planning and affordable, accessible public housing. HDB resale prices have faced upward pressure from supply-demand conditions and location preferences. One key channel is primary-school proximity: under MOE admission rules, distance bands matter, with households within 1km receiving priority.
 
-This raises the question: "Does proximity to "good" primary schools result in a measurable resale premium?" The project will emphasizes both predictive accuracy and interpretation quality for policy use, taking into consideration flat attributes, transport access, and neighborhood amenities. THe project will aim to create actionable insights for policy design within the MND to address these concerns should there be a premium associated with distance.
+This motivates the core question: does proximity to "good" primary schools produce a measurable resale premium after controls?
 
 ## 2. Scope
 
 ### 2.1 Problem
 
-MND needs an effect estimate that can be compared across specifications and geographies to avoid attributing general location premiums to school access alone. The product aims to address problems associated with accessibility: non-technical officers should be able to query our model output through a natural-language interface without writing code.
+MND needs school-proximity estimates that are comparable across specifications and geographies, so location premiums are not misattributed to schools. Non-technical officers also need natural-language access to model outputs.
 
 ### 2.2 Success Criteria
 
 Success criteria are defined at both business and operational levels.
 
-Business-facing criteria is to produce interpretable effect sizes, revealing where school effects are heterogeneous instead of assuming a single national premium, and provide evidence that can support policy discussions on housing affordability, neighborhood demand pressure, and planning trade-offs.
-
-Operational criteria is to build a reproducible geospatial feature pipeline from raw source layers to a transaction-level model table, preserving traceability of design choices across scripts and branches.
+Success requires interpretable effect sizes, geographic heterogeneity reporting, and reproducible source-to-model pipelines with traceable design choices.
 
 ### 2.3 Assumptions
 
 This report and the current implementation rely on a set of material assumptions.
 
-First, "good school" is operationalized as the top 59 schools by overall subscription pressure (applicants/vacancies), as well as other factors such as programs offered such as GEP and SAP. Upon collection of this data, our group adds in person bias in what we percieve as a good school, adding into the data set. While it produces a unique definition of a good school, it relys on both a systematic as well as a perceptive methodology in determining what a good school is.
+First, "good school" is operationalized using `good_primary_schools.csv` (top-59 by overall subscription pressure). This definition is operational and can be changed for sensitivity checks.
 
-Second, school influence is approximated through polygon-intersection logic between HDB building polygons and school buffers (1 km and 2 km Euclidean buffers). This represents spatial market signal, not guaranteed administrative eligibility.
-
-Third, transaction location is represented by geocoded address points matched to HDB polygons rather than exact unit-level coordinates, which introduces measurement error in boundary-near analyses.
-
-Fourth, in the optimized OneMap routing pipeline, OneMap API calls are reserved for nearest-distance fields while threshold-count fields use Euclidean approximations for tractability. This is an explicit engineering trade-off between route realism and runtime and quota constraints.
+Second, to reduce API calls, OneMap routing is used for nearest-distance fields while threshold-count fields use Euclidean approximations. This is an explicit trade-off between realism and runtime/quota constraints.
 
 Finally, causal interpretation remains conditional. The baseline hedonic and local boundary designs reduce confounding but do not fully eliminate sorting effects.
 
@@ -45,8 +39,38 @@ Although the report is written for data scientists, the project methods were sel
 | Policy and planning analyst | Are effects heterogeneous by local market? | `town_outputs/town_premium_results.csv` |
 | Data engineering maintainer | Can the pipeline be rerun safely at scale? | `build_resale_flat_school_dataset_onemaps.py` chunked and append-safe pipeline |
 
+### 2.5 Data
 
+The pipeline integrates transactional, geospatial, and amenity datasets.
 
+Data governance note: raw source data should be re-pulled from upstream providers (for example Kaggle, data.gov.sg, and scraping pipelines) instead of being treated as permanent versioned assets in the code repository.
+
+| Data source | Role in pipeline | Main path in repo |
+|---|---|---|
+| HDB resale transactions (`2017+`) | Target variable and structural covariates | `primary_boundaries/inputs/ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv` |
+| School subscription rankings | Good-school definition and school-tier labels | `good_primary_schools.csv` and `primary_boundaries/outputs/overall_subscription_rates.csv` |
+| URA Master Plan land use | Spatial entity assignment for school points | `primary_boundaries/inputs/MasterPlan2025LandUseLayer.geojson` |
+| HDB existing building polygons | Polygon matching and exposure transfer | `primary_boundaries/inputs/HDBExistingBuilding.geojson` |
+| Mall points and MRT exits | Accessibility covariates | `primary_boundaries/outputs/shopping_centres_points.geojson` and `primary_boundaries/outputs/mrt_exits_tagged_with_lines.geojson` |
+| Engineered OneMap feature table | Final model-ready dataset | `primary_boundaries/outputs/onemap/resale_flats_with_school_buffer_counts_onemap.csv` |
+
+Current coverage statistics in generated artifacts:
+
+- Total schools in subscription table: `179`
+- "Good schools" selected: `59`
+- Shopping centres mapped: `155`
+- MRT exits tagged: `597`
+- HDB polygons loaded: `13,386`
+- Resale address points matched to HDB polygons: `9,568`
+- Unmatched address points: `28`
+
+### 2.6 Required APIs and External Services
+
+Two external services are used in this project workflow.
+
+The first is the OneMap routing API (`https://www.onemap.gov.sg/api/public/routingsvc/route`), used for nearest walking distance to malls and MRT stations. The project requires a valid OneMap access token (`ONEMAP_API_KEY`) in `.env`. Without this token, the OneMap distance-provider mode fails early by design.
+
+The second is Kaggle dataset access (`kagglehub`) for enrichment sources used in preprocessing scripts (for example, shopping-centre coordinate seeds and MRT metadata tables). These scripts require local Kaggle authentication setup when rerunning data pulls.
 
 ## 3. Methodology
 
@@ -56,7 +80,7 @@ The project separates conceptual assumptions (Section 2.3) from technical assump
 
 Spatial layers are normalized to WGS84 for ingestion and projected to SVY21 (`EPSG:3414`) where meter-based operations are required. This ensures consistent buffering and distance logic.
 
-School boundaries are constructed by joining school points to URA master-plan land-use polygons, with de-duplication rules for repeated URA object IDs. From these cleaned polygons, 1 km and 2 km Euclidean buffers are generated.
+School boundaries are constructed by joining school points to URA master-plan land-use polygons, with de-duplication rules for repeated URA object IDs. From these cleaned polygons, 1 km and 2 km Euclidean buffers are generated. This comes from the assumption that data is shared across ministries in Singapore, requiring collaboration between URA, MOE and HDB.
 
 For routing features, the OneMap implementation uses candidate pre-filtering by Euclidean radius and nearest-candidate cap (`k`). The latest optimization keeps OneMap calls for nearest mall and MRT distances while computing 10-minute count features from Euclidean thresholds. Additional deduplication groups repeated origin coordinates to reduce repeated API calls.
 
@@ -81,51 +105,7 @@ Within `Hedonic-Model`, model estimation is implemented in:
 - [`hedonic_model/run_school_boundary_rdd.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py)
 - [`hedonic_model/run_town_premium_models.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py)
 
-### 3.3 Data
-
-The pipeline integrates transactional, geospatial, and amenity datasets.
-
-Data governance note: by design, raw source data should be re-pulled from upstream providers (for example Kaggle, data.gov.sg, and scraping pipelines) rather than treated as permanent versioned assets in the code repository.
-
-| Data source | Role in pipeline | Main path in repo |
-|---|---|---|
-| HDB resale transactions (`2017+`) | Target variable and structural covariates | `primary_boundaries/inputs/ResaleflatpricesbasedonregistrationdatefromJan2017onwards.csv` |
-| School subscription rankings | Good-school definition and school-tier labels | `good_primary_schools.csv` and `primary_boundaries/outputs/overall_subscription_rates.csv` |
-| URA Master Plan land use | Spatial entity assignment for school points | `primary_boundaries/inputs/MasterPlan2025LandUseLayer.geojson` |
-| HDB existing building polygons | Polygon matching and exposure transfer | `primary_boundaries/inputs/HDBExistingBuilding.geojson` |
-| Mall points and MRT exits | Accessibility covariates | `primary_boundaries/outputs/shopping_centres_points.geojson` and `primary_boundaries/outputs/mrt_exits_tagged_with_lines.geojson` |
-| Engineered OneMap feature table | Final model-ready dataset | `primary_boundaries/outputs/onemap/resale_flats_with_school_buffer_counts_onemap.csv` |
-
-Current coverage statistics in generated artifacts:
-
-- Total schools in subscription table: `179`
-- "Good schools" selected: `59`
-- Shopping centres mapped: `155`
-- MRT exits tagged: `597`
-- HDB polygons loaded: `13,386`
-- Resale address points matched to HDB polygons: `9,568`
-- Unmatched address points: `28`
-
-### 3.4 Required APIs and External Services
-
-Two external services are used in this project workflow.
-
-The first is the OneMap routing API (`https://www.onemap.gov.sg/api/public/routingsvc/route`), used for nearest walking distance to malls and MRT stations. The project requires a valid OneMap access token (`ONEMAP_API_KEY`) in `.env`. Without this token, the OneMap distance-provider mode fails early by design.
-
-The second is Kaggle dataset access (`kagglehub`) for selected enrichment sources used in preprocessing scripts (for example, shopping-centre coordinate seeds and MRT metadata tables). These scripts require local Kaggle authentication setup when rerunning data pulls.
-
-### 3.5 School Location Distribution Map
-
-To support quick visual validation of coverage, we render the school point layer on an interactive Folium map:
-
-<iframe src="assets/maps/school_location_distribution_map.html" width="100%" height="520" style="border:1px solid #d9d9d9; border-radius:6px;"></iframe>
-
-If your browser blocks the iframe in local preview, open this direct link:
-[School location distribution map](assets/maps/school_location_distribution_map.html)
-
-The map shows 179 school points distributed across the island, with visible concentration in dense residential planning areas and lower density in industrial or low-population zones. This visual check is useful for detecting coordinate errors (for example, points plotted offshore) before downstream buffer and distance calculations are run.
-
-### 3.6 Experimental Design
+### 3.3 Experimental Design
 
 The experimental workflow has two layers: feature engineering and modelling.
 
@@ -146,7 +126,7 @@ At modelling level (`Hedonic-Model` branch), three complementary strategies are 
 
 This layered design is deliberate: the hedonic model gives broad association patterns, RDD provides a local validity stress test, and town-level models expose heterogeneity that pooled coefficients can hide.
 
-### 3.7 Model Selection Rationale (Why OLS + Ridge + RDD)
+### 3.4 Model Selection Rationale (Why OLS + Ridge + RDD)
 
 The modelling stack combines methods with complementary strengths.
 
@@ -167,9 +147,13 @@ Method alternatives were considered but not prioritized in this phase:
 | Full causal design only (no predictive model) | Better identification focus but loses practical forecasting and residual diagnostics benefits |
 | One universal treatment premium | Empirically inconsistent with town-level heterogeneity observed in outputs |
 
-### 3.8 Deployment
+### 3.5 School Location Distribution Map
 
-Deployment has two layers: MkDocs + GitHub Pages for the report, and a FastAPI service on the `api` branch (`/resales`, `/ols`, `/model`, `/rdd`, `/premiums`, `/predict`) using `data/` artifacts for API-backed LLM responses.
+To support visual validation of school-location coverage, we provide a static split map (green points = Good schools, blue points = Not good schools):
+
+![School location distribution map](assets/figures/school_location_distribution_map_static.png)
+
+The map shows 179 school points across the island (`53` good, `126` not good in the joined point layer), with denser clusters in major residential belts. This is used as a QC check before downstream buffer and distance feature generation.
 
 ## 4. Findings
 
@@ -186,16 +170,16 @@ The engineered dataset in active use contains `223,550` resale rows and 27 colum
 Representative descriptive plots:
 
 ![Town distribution](assets/figures/plot_a_town_distribution_top.png)
-This plot shows transaction concentration in a small set of towns, with Sengkang and Punggol among the highest-volume markets, indicating that pooled estimates are strongly influenced by these submarkets.
+Transactions are concentrated in a few towns (notably Sengkang and Punggol), so pooled estimates are strongly shaped by these submarkets.
 
 ![Flat type distribution](assets/figures/plot_b_flat_type_distribution.png)
-This plot shows that 4-room and 5-room transactions dominate the sample, while 1-room and multi-generation flats are rare; model interpretation should therefore be read as most representative of mass-market flat types.
+4-room and 5-room flats dominate the sample, so results are most representative of mass-market flat types.
 
 ![Resale price distribution](assets/figures/plot_c1_price_hist_all.png)
-This distribution is right-skewed with a long high-price tail, supporting the use of `log(resale_price)` to stabilize variance for regression.
+The distribution is right-skewed with a high-price tail, supporting `log(resale_price)` modeling.
 
 ![MRT lines within 10-minute walk](assets/figures/plot_d_mrt_lines_distribution.png)
-This plot suggests a positive accessibility gradient, where median resale prices generally rise with more nearby rail-line options, while high-line-count tail categories are small and should be interpreted cautiously.
+Median prices generally rise with more nearby rail-line options; high-line-count tail bins are small and should be interpreted cautiously.
 
 From hedonic outputs (`hedonic_model/outputs/metrics.json`):
 
@@ -226,7 +210,7 @@ Key significant variables from OLS:
 - `good_school_count_1km`: `+0.0088` (p < 1e-9)
 - `pscore` note: not included as a standalone continuous regressor in this baseline; it is used indirectly via good-school tier/count construction.
 
-Using the sample median resale price (about SGD 495k), a `-1.62%` pooled premium corresponds to roughly `-SGD 8.0k`, while a `+0.88%` marginal premium per additional good school within 1 km corresponds to about `+SGD 4.4k`. This sign inconsistency implies policy teams should not rely on one pooled number for pricing-impact decisions.
+At the sample median resale price (about SGD 495k), `-1.62%` is roughly `-SGD 8.0k`, while `+0.88%` per additional good school within 1 km is roughly `+SGD 4.4k`. This sign inconsistency means policy teams should not rely on a single pooled premium.
 
 From nested specification tracing (`good_school_sign_trace.csv`):
 
@@ -242,11 +226,7 @@ Short consolidation table from boundary RDD (`hedonic_model/rdd_outputs/rdd_resu
 | Controlled | 100 | 32,185 | +0.34 | 0.1216 |
 | School fixed effects | 100 | 32,185 | +0.24 | 0.2558 |
 
-Meaning of the RDD specifications:
-
-- **Uncontrolled**: local boundary jump estimated with only treatment and running-variable terms, without additional covariates. This is the most vulnerable to local composition differences.
-- **Controlled**: adds structural and market controls (for example, floor area, lease variables, flat type/model, town and month effects), reducing omitted-variable bias around the cutoff.
-- **School fixed effects**: controlled model plus school-specific fixed effects, so identification comes from within-school boundary variation rather than pooled cross-school level differences.
+RDD specifications differ by control intensity: `Uncontrolled` uses treatment and running-variable terms only; `Controlled` adds structural/market covariates; `School fixed effects` adds school FE so identification is from within-school boundary variation.
 
 Effect size and significance are strongly specification-sensitive, with uncontrolled estimates markedly more negative than controlled variants.
 
@@ -261,17 +241,19 @@ Static planning-area sign map (`good_school_within_1km`; green positive, red neg
 
 ![Planning-area sign map for good school within 1km](assets/figures/planning_area_good_school_within_1km_sign_static.png)
 
-Short read of the map: signs are mixed islandwide (`10` positive, `15` negative, `3` near-zero), so the school effect is not uniformly positive. The core areas mapped from `CENTRAL AREA` (Downtown Core, Rochor, Outram) are negative in this run, so the pattern is not simply "more central = more positive". The map shows sign, not counts, but positive-sign towns also have higher average `good_school_count_1km` (`0.84` vs `0.60`); this remains associative, not causal.
+Short read: signs are mixed (`10` positive, `15` negative, `3` near-zero), so effects are not uniformly positive. Core areas mapped from `CENTRAL AREA` are negative in this run. Positive-sign towns show higher average `good_school_count_1km` (`0.84` vs `0.60`), but this is associative, not causal.
 
 Coefficient table: `docs/assets/data/town_good_school_within_1km_sign_summary.csv`.
 
-### 4.2 Discussion
+## 5. Discussion, Recommendations, and Limitations
 
-Pooled headline effects are unstable across specifications, so "near a good school always raises prices" is not supported once richer controls are added. Town-level heterogeneity is also strong and mixed in sign, which argues against a single citywide premium.
+### 5.1 Discussion
 
-Local boundary evidence weakens after controls versus uncontrolled comparisons, suggesting part of the raw discontinuity reflects local composition differences. School variables should therefore be interpreted as one component of a broader spatial bundle with accessibility, structural attributes, and time-location effects.
+Pooled effects are unstable across specifications, so "near a good school always raises prices" is not supported once richer controls are added. Town-level heterogeneity is also strong and mixed in sign, arguing against a single citywide premium.
 
-### 4.3 Recommendations
+Local boundary evidence weakens after controls versus uncontrolled comparisons, suggesting part of the raw discontinuity reflects local composition differences. School variables should be interpreted as one component of a broader spatial bundle with accessibility, structural attributes, and time-location effects.
+
+### 5.2 Recommendations
 
 For the next project phase, we recommend prioritizing four items.
 
@@ -285,7 +267,7 @@ For the next project phase, we recommend prioritizing four items.
 
 Given current evidence, the safest policy-facing conclusion is that school proximity is associated with resale prices, but the sign and magnitude are context-dependent and model-sensitive. Policy interpretation should therefore use local and specification-aware estimates rather than one universal premium.
 
-### 4.4 Limitations, Bias Risks, and Mitigations
+### 5.3 Limitations, Bias Risks, and Mitigations
 
 Key technical limitations remain and should be considered when interpreting the outputs.
 
@@ -296,3 +278,135 @@ Key technical limitations remain and should be considered when interpreting the 
 5. **Sample selection effects**: rows without successful geocode and polygon match are dropped (`2,921` rows), which can introduce mild selection bias if missingness is systematic.
 
 Current mitigations in the implementation include time and town fixed effects, nested specification tracing, local RDD checks under multiple bandwidths, and explicit chunked rerun logic for reproducibility. Future work should include robustness sweeps on school definitions, placebo-boundary tests, and finer geocoding where feasible.
+
+## 6. System Architecture
+
+### 6.1 Overview
+
+The intended architecture has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer. The backend (`api` branch) handles retrieval, filtering, and inference; artifacts are precomputed offline and loaded at runtime.
+
+```mermaid
+flowchart TD
+    A["Data Sources"] --> B["Preprocessing<br/>primary_boundaries"]
+    B --> C["Feature Table"]
+    C --> D["Modeling<br/>hedonic_model"]
+    D --> E["Artifacts<br/>CSV/JSON/PKL"]
+    E --> F["FastAPI Backend<br/>api branch"]
+    F --> G["LLM Query Layer"]
+    G --> H["Policy User"]
+    E --> I["MkDocs Report"]
+
+    classDef source fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
+    classDef prep fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
+    classDef app fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+    classDef output fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
+
+    class A source;
+    class B,C prep;
+    class D,E model;
+    class F,G,H app;
+    class I output;
+```
+
+### 6.2 Backend Design
+
+Endpoints are grouped by function to separate observed data from model outputs.
+
+Core model endpoints:
+
+- `POST /predict`
+- `GET /model/metrics`
+- `GET /model/feature-importance`
+- `GET /model/coefficients`
+- `GET /model/coefficients/{term_name}`
+
+Data endpoints:
+
+- `GET /resales/raw`
+- `GET /resales/schema`
+- `GET /resales/summary`
+
+Analytical endpoints:
+
+- `GET /rdd/results`
+- `GET /rdd/group-ttests`
+- `GET /town-premiums`
+- `GET /benchmarks/results`
+- `GET /diagnostics/sign-trace`
+
+### 6.3 Model Serving
+
+Models are trained offline and served from serialized artifacts (`ridge_pipeline.pkl`, `metrics.json`, `ols_coefficients.csv`, and RDD/town-premium tables under `data/` on the `api` branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.
+
+```mermaid
+flowchart TD
+    A["Engineered Data"] --> B["Train/Test Split"]
+    B --> C["Ridge<br/>prediction"]
+    B --> D["OLS<br/>coefficients"]
+    B --> E["RDD"]
+    B --> F["Town Premiums"]
+    C --> G["metrics.json<br/>ridge_pipeline.pkl"]
+    D --> H["ols_coefficients.csv"]
+    E --> I["school_specific_rdd_*.csv"]
+    F --> J["town_premium_*.csv"]
+    G --> K["API /predict + /model/*"]
+    H --> K
+    I --> L["API /rdd/*"]
+    J --> M["API /town-premiums/*"]
+
+    classDef data fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
+    classDef train fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
+    classDef api fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+
+    class A data;
+    class B train;
+    class C,D,E,F,G,H,I,J model;
+    class K,L,M api;
+```
+
+### 6.4 LLM Interface
+
+Natural-language queries are mapped to endpoint intents and routed to backend/model outputs.
+Flow: `User -> LLM/parser -> backend -> model/artifact -> response`.
+
+## 7. Application (LLM App)
+
+### 7.1 User Interface
+
+Frontend code is not present in this branch.
+
+### 7.2 Supported Queries
+
+Example query classes:
+- Prediction: "Estimate price of a 4-room flat in Tampines" -> `POST /predict`
+- Policy insight: "How much do good schools affect prices?" -> `GET /model/coefficients` / `GET /rdd/results` / `GET /town-premiums`
+- Scenario analysis: "Compare flats near and far from good schools" -> `GET /resales/summary`
+
+### 7.3 Output Format
+
+Outputs are JSON rendered as predicted price (with default warnings), school-premium signals, and concise explanatory text.
+
+## 8. Deployment
+
+### 8.1 Deployment Architecture
+
+Deployment has two layers: MkDocs + GitHub Pages documentation, and FastAPI on the `api` branch (`/resales`, `/model`, `/rdd`, `/town-premiums`, `/diagnostics`, `/benchmarks`, `/predict`) using `data/` artifacts.
+
+### 8.2 Containerisation
+
+No Dockerfile/container configuration is present in this branch.
+
+### 8.3 Running the Application
+
+Backend run instructions:
+
+1. Checkout branch `api`.
+2. Install dependencies (`uv sync`).
+3. Start backend: `uv run uvicorn api.main:app --reload` (or `uvicorn api.main:app --reload`).
+4. Access API docs at `http://127.0.0.1:8000/docs`.
+
+### 8.4 Optional Cloud Deployment
+
+No cloud deployment configuration or public endpoint is documented in this repository.
