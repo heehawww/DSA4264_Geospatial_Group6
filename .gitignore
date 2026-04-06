@@ -2,6 +2,7 @@
 __pycache__/
 *.py[codz]
 *$py.class
+.DS_Store
 
 # C extensions
 *.so
@@ -214,6 +215,12 @@ primary_boundaries/outputs/
 hedonic_model/outputs/
 hedonic_model/rdd_outputs/
 hedonic_model/scored_outputs/
+hedonic_model/diagnostic_outputs/
+hedonic_model/town_outputs/
+hedonic_model/reduced_outputs/
+hedonic_model/rebalanced_outputs/
+hedonic_model/weighted_outputs/
+hedonic_model/benchmark_outputs/
 outputs/
 outputs/onemap/
 primary_boundaries/inputs/*

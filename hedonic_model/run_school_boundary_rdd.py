@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a boundary-based RDD around the 1km good-school cutoff."""
+"""Run school-specific boundary RDDs around 1km school cutoffs."""
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-from shapely.strtree import STRtree
+from scipy import stats
 
 SVY21_EPSG = 3414
 
@@ -88,45 +88,42 @@ def load_points(points_path: Path) -> gpd.GeoDataFrame:
     return points.to_crs(SVY21_EPSG)
 
 
-def load_good_school_buffers(buffers_path: Path) -> gpd.GeoDataFrame:
+def load_school_buffers(buffers_path: Path) -> gpd.GeoDataFrame:
     buffers = gpd.read_file(buffers_path)
     if buffers.crs is None:
         buffers = buffers.set_crs(4326)
     buffers = buffers.to_crs(SVY21_EPSG)
     buffers["is_good_school"] = normalise_bool(buffers["is_good_school"])
-    buffers = buffers.loc[buffers["is_good_school"]].copy()
     if buffers.empty:
-        raise ValueError("No good-school polygons found in buffer layer.")
+        raise ValueError("No school polygons found in buffer layer.")
     return buffers
 
 
-def compute_signed_distances(points: gpd.GeoDataFrame, buffers: gpd.GeoDataFrame) -> pd.DataFrame:
-    boundaries = list(buffers.geometry.boundary)
-    tree = STRtree(boundaries)
-    index_lookup = {geometry.wkb: idx for idx, geometry in enumerate(boundaries)}
-
+def compute_school_specific_distances(
+    points: gpd.GeoDataFrame,
+    buffers: gpd.GeoDataFrame,
+    max_bandwidth_m: int,
+) -> pd.DataFrame:
     rows: list[dict[str, object]] = []
-    for point_row in points.itertuples(index=False):
-        nearest_boundary = tree.nearest(point_row.geometry)
-        if isinstance(nearest_boundary, (int, np.integer)):
-            boundary_idx = int(nearest_boundary)
-            boundary_geom = boundaries[boundary_idx]
-        else:
-            boundary_idx = index_lookup[nearest_boundary.wkb]
-            boundary_geom = nearest_boundary
-        school_row = buffers.iloc[boundary_idx]
-        distance_m = float(point_row.geometry.distance(boundary_geom))
-        inside = bool(school_row.geometry.covers(point_row.geometry))
-        rows.append(
-            {
-                "address_key": point_row.address_key,
-                "boundary_school_name": school_row.school_name,
-                "boundary_school_join_key": school_row.join_key,
-                "overall_subscription_rates": school_row.get("overall_subscription_rates", np.nan),
-                "signed_distance_m": -distance_m if inside else distance_m,
-                "inside_good_school_1km": int(inside),
-            }
-        )
+
+    for school_row in buffers.itertuples(index=False):
+        boundary = school_row.geometry.boundary
+        for point_row in points.itertuples(index=False):
+            distance_m = float(point_row.geometry.distance(boundary))
+            if distance_m > max_bandwidth_m:
+                continue
+            inside = bool(school_row.geometry.covers(point_row.geometry))
+            rows.append(
+                {
+                    "address_key": point_row.address_key,
+                    "boundary_school_name": school_row.school_name,
+                    "boundary_school_join_key": school_row.join_key,
+                    "is_good_school": bool(school_row.is_good_school),
+                    "overall_subscription_rates": getattr(school_row, "overall_subscription_rates", np.nan),
+                    "signed_distance_m": -distance_m if inside else distance_m,
+                    "inside_good_school_1km": int(inside),
+                }
+            )
 
     return pd.DataFrame(rows)
 
@@ -161,7 +158,13 @@ def run_local_linear_rdd(df: pd.DataFrame, bandwidth_m: int, specification: str)
     return model, table
 
 
-def extract_rdd_metrics(model: object, bandwidth_m: int, sample_size: int, spec_name: str) -> dict[str, float | int | str]:
+def extract_rdd_metrics(
+    model: object,
+    local_df: pd.DataFrame,
+    bandwidth_m: int,
+    sample_size: int,
+    spec_name: str,
+) -> dict[str, float | int | str]:
     if "treat" not in model.params.index:
         raise ValueError("RDD model did not estimate a treatment jump.")
 
@@ -169,6 +172,9 @@ def extract_rdd_metrics(model: object, bandwidth_m: int, sample_size: int, spec_
     std_err = float(model.bse["treat"])
     ci_low = coef - 1.96 * std_err
     ci_high = coef + 1.96 * std_err
+    premium_pct = float(math.exp(coef) - 1)
+    mean_price = float(local_df["resale_price"].mean())
+    median_price = float(local_df["resale_price"].median())
     return {
         "specification": spec_name,
         "bandwidth_m": int(bandwidth_m),
@@ -176,37 +182,142 @@ def extract_rdd_metrics(model: object, bandwidth_m: int, sample_size: int, spec_
         "cutoff_coef_log_points": coef,
         "cutoff_std_err": std_err,
         "cutoff_p_value": float(model.pvalues["treat"]),
-        "cutoff_premium_pct": float(math.exp(coef) - 1),
+        "cutoff_premium_pct": premium_pct,
+        "cutoff_price_jump_sgd_at_local_mean_price": premium_pct * mean_price,
+        "cutoff_price_jump_sgd_at_local_median_price": premium_pct * median_price,
+        "local_mean_resale_price": mean_price,
+        "local_median_resale_price": median_price,
         "cutoff_ci_low_pct": float(math.exp(ci_low) - 1),
         "cutoff_ci_high_pct": float(math.exp(ci_high) - 1),
         "r_squared": float(model.rsquared),
     }
 
 
-def run_balance_check(df: pd.DataFrame, bandwidth_m: int, outcome: str) -> dict[str, float | int | str]:
-    local = df.loc[df["distance_abs_m"] <= bandwidth_m].copy()
-    local["running_km"] = local["signed_distance_m"] / 1000
-    local["treat"] = (local["signed_distance_m"] <= 0).astype(int)
-    local["kernel_weight"] = triangular_weights(local["distance_abs_m"], bandwidth_m)
+def run_school_specific_rdd(
+    model_df: pd.DataFrame,
+    bandwidths: list[int],
+    min_total: int,
+    min_each_side: int,
+) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    results: list[dict[str, float | int | str]] = []
+    coefficient_tables: list[pd.DataFrame] = []
+    skipped: list[dict[str, float | int | str]] = []
 
-    model = smf.wls(
-        f"{outcome} ~ treat + running_km + treat:running_km",
-        data=local,
-        weights=local["kernel_weight"],
-    ).fit(cov_type="HC1")
+    for (school_name, is_good_school), school_df in model_df.groupby(["boundary_school_name", "is_good_school"]):
+        for bandwidth_m in bandwidths:
+            local_df = school_df.loc[school_df["distance_abs_m"] <= bandwidth_m].copy()
+            inside_n = int((local_df["signed_distance_m"] <= 0).sum())
+            outside_n = int((local_df["signed_distance_m"] > 0).sum())
+            total_n = int(len(local_df))
 
-    return {
-        "outcome": outcome,
-        "bandwidth_m": int(bandwidth_m),
-        "sample_size": int(len(local)),
-        "cutoff_coef": float(model.params["treat"]),
-        "cutoff_std_err": float(model.bse["treat"]),
-        "cutoff_p_value": float(model.pvalues["treat"]),
-    }
+            if total_n < min_total or inside_n < min_each_side or outside_n < min_each_side:
+                skipped.append(
+                    {
+                        "boundary_school_name": school_name,
+                        "school_group": "good" if bool(is_good_school) else "non_good",
+                        "bandwidth_m": int(bandwidth_m),
+                        "sample_size": total_n,
+                        "inside_n": inside_n,
+                        "outside_n": outside_n,
+                        "reason": "insufficient_boundary_sample",
+                    }
+                )
+                continue
+
+            for spec_name in ("uncontrolled", "controlled"):
+                model, coef_table = run_local_linear_rdd(
+                    school_df,
+                    bandwidth_m=bandwidth_m,
+                    specification=spec_name,
+                )
+                result = extract_rdd_metrics(model, local_df, bandwidth_m, total_n, spec_name)
+                result["boundary_school_name"] = school_name
+                result["school_group"] = "good" if bool(is_good_school) else "non_good"
+                result["inside_n"] = inside_n
+                result["outside_n"] = outside_n
+                results.append(result)
+                coefficient_tables.append(
+                    coef_table.assign(
+                        boundary_school_name=school_name,
+                        school_group="good" if bool(is_good_school) else "non_good",
+                        specification=spec_name,
+                        bandwidth_m=bandwidth_m,
+                    )
+                )
+
+    if results:
+        results_df = pd.DataFrame(results).sort_values(["boundary_school_name", "bandwidth_m", "specification"])
+    else:
+        results_df = pd.DataFrame(
+            columns=[
+                "boundary_school_name",
+                "specification",
+                "bandwidth_m",
+                "sample_size",
+                "inside_n",
+                "outside_n",
+            ]
+        )
+    coef_df = pd.concat(coefficient_tables, ignore_index=True) if coefficient_tables else pd.DataFrame()
+    skipped_df = (
+        pd.DataFrame(skipped).sort_values(["boundary_school_name", "bandwidth_m"])
+        if skipped
+        else pd.DataFrame(columns=["boundary_school_name", "bandwidth_m", "sample_size", "inside_n", "outside_n", "reason"])
+    )
+    return results_df, coef_df, skipped_df
+
+
+def run_group_ttests(results_df: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, float | int | str]] = []
+    if results_df.empty:
+        return pd.DataFrame()
+
+    for (bandwidth_m, specification), subset in results_df.groupby(["bandwidth_m", "specification"]):
+        good = subset.loc[subset["school_group"] == "good", "cutoff_premium_pct"].dropna()
+        non_good = subset.loc[subset["school_group"] == "non_good", "cutoff_premium_pct"].dropna()
+
+        if len(good) < 2 or len(non_good) < 2:
+            rows.append(
+                {
+                    "bandwidth_m": int(bandwidth_m),
+                    "specification": specification,
+                    "n_good": int(len(good)),
+                    "n_non_good": int(len(non_good)),
+                    "mean_good_premium_pct": float(good.mean()) if len(good) else np.nan,
+                    "mean_non_good_premium_pct": float(non_good.mean()) if len(non_good) else np.nan,
+                    "mean_diff_premium_pct": (
+                        float(good.mean() - non_good.mean()) if len(good) and len(non_good) else np.nan
+                    ),
+                    "welch_t_stat": np.nan,
+                    "welch_p_value": np.nan,
+                    "note": "insufficient_group_results",
+                }
+            )
+            continue
+
+        t_stat, p_value = stats.ttest_ind(good, non_good, equal_var=False)
+        rows.append(
+            {
+                "bandwidth_m": int(bandwidth_m),
+                "specification": specification,
+                "n_good": int(len(good)),
+                "n_non_good": int(len(non_good)),
+                "mean_good_premium_pct": float(good.mean()),
+                "mean_non_good_premium_pct": float(non_good.mean()),
+                "mean_diff_premium_pct": float(good.mean() - non_good.mean()),
+                "median_good_premium_pct": float(good.median()),
+                "median_non_good_premium_pct": float(non_good.median()),
+                "welch_t_stat": float(t_stat),
+                "welch_p_value": float(p_value),
+                "note": "",
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values(["bandwidth_m", "specification"])
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Boundary RDD around the 1km good-school cutoff")
+    parser = argparse.ArgumentParser(description="School-specific boundary RDD around 1km school cutoffs")
     parser.add_argument(
         "--transactions-csv",
         default="walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv",
@@ -234,6 +345,18 @@ def main() -> None:
         default=[100, 200, 300, 500],
         help="Bandwidths in meters for local linear RDD",
     )
+    parser.add_argument(
+        "--school-min-total",
+        type=int,
+        default=150,
+        help="Minimum total local observations required for school-specific RDD",
+    )
+    parser.add_argument(
+        "--school-min-each-side",
+        type=int,
+        default=40,
+        help="Minimum observations required on each side of the cutoff for school-specific RDD",
+    )
     args = parser.parse_args()
 
     transactions_path = Path(args.transactions_csv)
@@ -255,20 +378,19 @@ def main() -> None:
     print("Loading geocoded HDB address points...")
     points = load_points(points_path)[["address_key", "geometry"]].copy()
 
-    print("Loading good-school 1km buffers...")
-    buffers = load_good_school_buffers(buffers_path)
-
-    print("Computing signed distances to nearest good-school buffer boundary...")
-    signed_distances = compute_signed_distances(points, buffers)
-    signed_distances = (
-        signed_distances.sort_values("signed_distance_m", key=lambda series: series.abs())
-        .drop_duplicates(subset=["address_key"], keep="first")
-        .copy()
+    print("Loading 1km school buffers...")
+    buffers = load_school_buffers(buffers_path)
+    max_bandwidth_m = max(args.bandwidths)
+    print("Computing school-specific signed distances near each school boundary...")
+    school_specific_distances = compute_school_specific_distances(points, buffers, max_bandwidth_m=max_bandwidth_m)
+    school_specific_model_df = transactions.merge(
+        school_specific_distances,
+        on="address_key",
+        how="inner",
+        validate="m:m",
     )
-
-    model_df = transactions.merge(signed_distances, on="address_key", how="inner", validate="m:1")
-    model_df["distance_abs_m"] = model_df["signed_distance_m"].abs()
-    model_df = model_df.dropna(
+    school_specific_model_df["distance_abs_m"] = school_specific_model_df["signed_distance_m"].abs()
+    school_specific_model_df = school_specific_model_df.dropna(
         subset=[
             "log_resale_price",
             "floor_area_sqm",
@@ -279,42 +401,45 @@ def main() -> None:
         ]
     )
 
-    signed_distances.to_csv(output_dir / "address_signed_distances.csv", index=False)
-    model_df.head(2000).to_csv(output_dir / "rdd_sample_preview.csv", index=False)
+    school_results_df, school_coef_df, school_skipped_df = run_school_specific_rdd(
+        school_specific_model_df,
+        bandwidths=args.bandwidths,
+        min_total=args.school_min_total,
+        min_each_side=args.school_min_each_side,
+    )
 
-    results: list[dict[str, float | int | str]] = []
-    coefficient_tables: list[pd.DataFrame] = []
-    balance_rows: list[dict[str, float | int | str]] = []
+    school_specific_distances.to_csv(output_dir / "school_specific_address_signed_distances.csv", index=False)
+    school_results_df.to_csv(output_dir / "school_specific_rdd_results.csv", index=False)
+    school_coef_df.to_csv(output_dir / "school_specific_rdd_coefficients.csv", index=False)
+    school_skipped_df.to_csv(output_dir / "school_specific_rdd_skipped.csv", index=False)
+    (output_dir / "school_specific_rdd_results.json").write_text(
+        school_results_df.to_json(orient="records", indent=2)
+    )
 
-    for bandwidth_m in args.bandwidths:
-        for spec_name in ("uncontrolled", "controlled", "school_fe"):
-            print(f"Estimating {spec_name} RDD at {bandwidth_m}m bandwidth...")
-            model, coef_table = run_local_linear_rdd(model_df, bandwidth_m=bandwidth_m, specification=spec_name)
-            local_n = int((model_df["distance_abs_m"] <= bandwidth_m).sum())
-            results.append(extract_rdd_metrics(model, bandwidth_m, local_n, spec_name))
-            coefficient_tables.append(coef_table.assign(specification=spec_name, bandwidth_m=bandwidth_m))
-
-        for outcome in BASE_CONTROLS:
-            balance_rows.append(run_balance_check(model_df, bandwidth_m=bandwidth_m, outcome=outcome))
-
-    results_df = pd.DataFrame(results).sort_values(["bandwidth_m", "specification"])
-    coef_df = pd.concat(coefficient_tables, ignore_index=True)
-    balance_df = pd.DataFrame(balance_rows).sort_values(["bandwidth_m", "outcome"])
-
-    results_df.to_csv(output_dir / "rdd_results.csv", index=False)
-    coef_df.to_csv(output_dir / "rdd_coefficients.csv", index=False)
-    balance_df.to_csv(output_dir / "rdd_covariate_balance.csv", index=False)
-    (output_dir / "rdd_results.json").write_text(results_df.to_json(orient="records", indent=2))
+    group_ttests_df = run_group_ttests(school_results_df)
+    group_ttests_df.to_csv(output_dir / "school_group_ttests.csv", index=False)
+    (output_dir / "school_group_ttests.json").write_text(
+        group_ttests_df.to_json(orient="records", indent=2)
+    )
 
     summary = {
-        "transactions_with_geocoded_addresses": int(model_df["address_key"].nunique()),
-        "transaction_rows_used": int(len(model_df)),
-        "good_school_buffers": int(len(buffers)),
+        "transactions_with_geocoded_addresses": int(transactions["address_key"].nunique()),
+        "transaction_rows_used": int(len(transactions)),
+        "school_buffers_total": int(len(buffers)),
+        "school_buffers_good": int(buffers["is_good_school"].sum()),
+        "school_buffers_non_good": int((~buffers["is_good_school"]).sum()),
         "bandwidths_m": args.bandwidths,
+        "school_specific_rows_used": int(len(school_specific_model_df)),
+        "school_specific_schools_with_results": int(school_results_df["boundary_school_name"].nunique()) if not school_results_df.empty else 0,
     }
     (output_dir / "rdd_summary.json").write_text(json.dumps(summary, indent=2))
 
-    print(results_df.to_string(index=False))
+    if not school_results_df.empty:
+        print("\nSchool-specific RDD results:")
+        print(school_results_df.to_string(index=False))
+    if not group_ttests_df.empty:
+        print("\nGood vs non-good school Welch t-tests:")
+        print(group_ttests_df.to_string(index=False))
     print(f"Wrote RDD outputs to {output_dir}")
 
 
