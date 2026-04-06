@@ -13,6 +13,7 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
+from scipy import stats
 
 SVY21_EPSG = 3414
 
@@ -266,6 +267,55 @@ def run_school_specific_rdd(
     return results_df, coef_df, skipped_df
 
 
+def run_group_ttests(results_df: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, float | int | str]] = []
+    if results_df.empty:
+        return pd.DataFrame()
+
+    for (bandwidth_m, specification), subset in results_df.groupby(["bandwidth_m", "specification"]):
+        good = subset.loc[subset["school_group"] == "good", "cutoff_premium_pct"].dropna()
+        non_good = subset.loc[subset["school_group"] == "non_good", "cutoff_premium_pct"].dropna()
+
+        if len(good) < 2 or len(non_good) < 2:
+            rows.append(
+                {
+                    "bandwidth_m": int(bandwidth_m),
+                    "specification": specification,
+                    "n_good": int(len(good)),
+                    "n_non_good": int(len(non_good)),
+                    "mean_good_premium_pct": float(good.mean()) if len(good) else np.nan,
+                    "mean_non_good_premium_pct": float(non_good.mean()) if len(non_good) else np.nan,
+                    "mean_diff_premium_pct": (
+                        float(good.mean() - non_good.mean()) if len(good) and len(non_good) else np.nan
+                    ),
+                    "welch_t_stat": np.nan,
+                    "welch_p_value": np.nan,
+                    "note": "insufficient_group_results",
+                }
+            )
+            continue
+
+        t_stat, p_value = stats.ttest_ind(good, non_good, equal_var=False)
+        rows.append(
+            {
+                "bandwidth_m": int(bandwidth_m),
+                "specification": specification,
+                "n_good": int(len(good)),
+                "n_non_good": int(len(non_good)),
+                "mean_good_premium_pct": float(good.mean()),
+                "mean_non_good_premium_pct": float(non_good.mean()),
+                "mean_diff_premium_pct": float(good.mean() - non_good.mean()),
+                "median_good_premium_pct": float(good.median()),
+                "median_non_good_premium_pct": float(non_good.median()),
+                "welch_t_stat": float(t_stat),
+                "welch_p_value": float(p_value),
+                "note": "",
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values(["bandwidth_m", "specification"])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="School-specific boundary RDD around 1km school cutoffs")
     parser.add_argument(
@@ -366,6 +416,12 @@ def main() -> None:
         school_results_df.to_json(orient="records", indent=2)
     )
 
+    group_ttests_df = run_group_ttests(school_results_df)
+    group_ttests_df.to_csv(output_dir / "school_group_ttests.csv", index=False)
+    (output_dir / "school_group_ttests.json").write_text(
+        group_ttests_df.to_json(orient="records", indent=2)
+    )
+
     summary = {
         "transactions_with_geocoded_addresses": int(transactions["address_key"].nunique()),
         "transaction_rows_used": int(len(transactions)),
@@ -381,6 +437,9 @@ def main() -> None:
     if not school_results_df.empty:
         print("\nSchool-specific RDD results:")
         print(school_results_df.to_string(index=False))
+    if not group_ttests_df.empty:
+        print("\nGood vs non-good school Welch t-tests:")
+        print(group_ttests_df.to_string(index=False))
     print(f"Wrote RDD outputs to {output_dir}")
 
 
