@@ -6,3 +6,6 @@ theme:
 nav:
   - Home: index.md
   - Technical Report: technical_report.md
+extra_javascript:
+  - https://unpkg.com/mermaid@10/dist/mermaid.min.js
+  - javascripts/mermaid-init.js

@@ -105,7 +105,62 @@ Within `Hedonic-Model`, model estimation is implemented in:
 - [`hedonic_model/run_school_boundary_rdd.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py)
 - [`hedonic_model/run_town_premium_models.py`](https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py)
 
-### 3.3 Experimental Design
+### 3.3 End-to-End Project Flow
+
+```mermaid
+flowchart TD
+    A["Sources"] --> B["Preprocess"]
+    B --> C["Features"]
+    C --> D["Modeling"]
+    D --> E["Artifacts"]
+    E --> F["FastAPI"]
+    F --> G["LLM Layer"]
+    G --> H["Policy User"]
+    E --> I["MkDocs"]
+
+    classDef source fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
+    classDef prep fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
+    classDef app fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+    classDef output fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
+
+    class A source;
+    class B,C prep;
+    class D,E model;
+    class F,G,H app;
+    class I output;
+```
+
+### 3.4 Model Workflow
+
+```mermaid
+flowchart TD
+    A["Feature Data"] --> B["Train/Test"]
+    B --> C["Ridge"]
+    B --> D["OLS"]
+    B --> E["RDD"]
+    B --> F["Town Premium"]
+    C --> G["metrics + pipeline"]
+    D --> H["OLS table"]
+    E --> I["RDD tables"]
+    F --> J["Town tables"]
+    G --> K["API model/predict"]
+    H --> K
+    I --> L["API rdd/*"]
+    J --> M["API town-premiums/*"]
+
+    classDef data fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
+    classDef train fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
+    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
+    classDef api fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
+
+    class A data;
+    class B train;
+    class C,D,E,F,G,H,I,J model;
+    class K,L,M api;
+```
+
+### 3.5 Experimental Design
 
 The experimental workflow has two layers: feature engineering and modelling.
 
@@ -126,7 +181,7 @@ At modelling level (`Hedonic-Model` branch), three complementary strategies are 
 
 This layered design is deliberate: the hedonic model gives broad association patterns, RDD provides a local validity stress test, and town-level models expose heterogeneity that pooled coefficients can hide.
 
-### 3.4 Model Selection Rationale (Why OLS + Ridge + RDD)
+### 3.6 Model Selection Rationale (Why OLS + Ridge + RDD)
 
 The modelling stack combines methods with complementary strengths.
 
@@ -147,7 +202,7 @@ Method alternatives were considered but not prioritized in this phase:
 | Full causal design only (no predictive model) | Better identification focus but loses practical forecasting and residual diagnostics benefits |
 | One universal treatment premium | Empirically inconsistent with town-level heterogeneity observed in outputs |
 
-### 3.5 School Location Distribution Map
+### 3.7 School Location Distribution Map
 
 To support visual validation of school-location coverage, we provide a static split map (green points = Good schools, blue points = Not good schools):
 
@@ -285,30 +340,6 @@ Current mitigations in the implementation include time and town fixed effects, n
 
 The intended architecture has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer. The backend (`api` branch) handles retrieval, filtering, and inference; artifacts are precomputed offline and loaded at runtime.
 
-```mermaid
-flowchart TD
-    A["Data Sources"] --> B["Preprocessing<br/>primary_boundaries"]
-    B --> C["Feature Table"]
-    C --> D["Modeling<br/>hedonic_model"]
-    D --> E["Artifacts<br/>CSV/JSON/PKL"]
-    E --> F["FastAPI Backend<br/>api branch"]
-    F --> G["LLM Query Layer"]
-    G --> H["Policy User"]
-    E --> I["MkDocs Report"]
-
-    classDef source fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef prep fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef app fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-    classDef output fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
-
-    class A source;
-    class B,C prep;
-    class D,E model;
-    class F,G,H app;
-    class I output;
-```
-
 ### 6.2 Backend Design
 
 Endpoints are grouped by function to separate observed data from model outputs.
@@ -338,33 +369,6 @@ Analytical endpoints:
 ### 6.3 Model Serving
 
 Models are trained offline and served from serialized artifacts (`ridge_pipeline.pkl`, `metrics.json`, `ols_coefficients.csv`, and RDD/town-premium tables under `data/` on the `api` branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.
-
-```mermaid
-flowchart TD
-    A["Engineered Data"] --> B["Train/Test Split"]
-    B --> C["Ridge<br/>prediction"]
-    B --> D["OLS<br/>coefficients"]
-    B --> E["RDD"]
-    B --> F["Town Premiums"]
-    C --> G["metrics.json<br/>ridge_pipeline.pkl"]
-    D --> H["ols_coefficients.csv"]
-    E --> I["school_specific_rdd_*.csv"]
-    F --> J["town_premium_*.csv"]
-    G --> K["API /predict + /model/*"]
-    H --> K
-    I --> L["API /rdd/*"]
-    J --> M["API /town-premiums/*"]
-
-    classDef data fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef train fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef api fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-
-    class A data;
-    class B train;
-    class C,D,E,F,G,H,I,J model;
-    class K,L,M api;
-```
 
 ### 6.4 LLM Interface
 
