@@ -101,7 +101,7 @@ for a binary indicator coefficient `beta`.
 
 ## Boundary RDD
 
-A separate script estimates a local linear regression-discontinuity design around the `1km` good-school cutoff:
+A separate script estimates school-specific local linear regression-discontinuity designs around each primary school's `1km` cutoff:
 
 ```bash
 python3 hedonic_model/run_school_boundary_rdd.py
@@ -115,23 +115,23 @@ Default inputs:
 
 Default outputs in `hedonic_model/rdd_outputs/`:
 
-- `rdd_results.csv`
-- `rdd_coefficients.csv`
-- `address_signed_distances.csv`
+- `school_specific_rdd_results.csv`
+- `school_specific_rdd_coefficients.csv`
+- `school_specific_rdd_skipped.csv`
+- `school_specific_address_signed_distances.csv`
 - `rdd_summary.json`
 
-The running variable is the signed distance in meters from an HDB address point to the nearest good school's `1km` buffer boundary:
+The running variable is the signed distance in meters from an HDB address point to each school's `1km` buffer boundary:
 
 - negative: inside the `1km` catchment
 - positive: outside the `1km` catchment
 
-The script reports three specifications at each bandwidth:
+The script reports school-specific results at each bandwidth for:
 
 - `uncontrolled`
 - `controlled`
-- `school_fe` for a controlled local regression with school fixed effects
 
-This is a useful local design, but it is still approximate because the project uses address points rather than exact unit locations and pools multiple school markets together.
+This is a useful local design, but it is still approximate because the project uses address points rather than exact unit locations.
 
 ## Coefficient Trace
 
