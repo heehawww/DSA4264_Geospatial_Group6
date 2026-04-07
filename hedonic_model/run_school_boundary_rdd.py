@@ -316,6 +316,75 @@ def run_group_ttests(results_df: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows).sort_values(["bandwidth_m", "specification"])
 
 
+def run_inverse_variance_group_comparison(results_df: pd.DataFrame) -> pd.DataFrame:
+    rows: list[dict[str, float | int | str]] = []
+    if results_df.empty:
+        return pd.DataFrame()
+
+    work = results_df.copy()
+    work["premium_se_pct"] = work["cutoff_std_err"] * (1.0 + work["cutoff_premium_pct"])
+    work["var_premium_pct"] = work["premium_se_pct"] ** 2
+    work = work.replace([np.inf, -np.inf], np.nan)
+
+    for (bandwidth_m, specification), subset in work.groupby(["bandwidth_m", "specification"]):
+        subset = subset.dropna(subset=["cutoff_premium_pct", "var_premium_pct", "school_group"])
+        subset = subset.loc[subset["var_premium_pct"] > 0].copy()
+        if subset.empty:
+            continue
+
+        good = subset.loc[subset["school_group"] == "good"].copy()
+        non_good = subset.loc[subset["school_group"] == "non_good"].copy()
+
+        if len(good) < 2 or len(non_good) < 2:
+            rows.append(
+                {
+                    "bandwidth_m": int(bandwidth_m),
+                    "specification": specification,
+                    "n_good": int(len(good)),
+                    "n_non_good": int(len(non_good)),
+                    "ivw_mean_good_premium_pct": np.nan,
+                    "ivw_mean_non_good_premium_pct": np.nan,
+                    "ivw_mean_diff_premium_pct": np.nan,
+                    "ivw_diff_std_err": np.nan,
+                    "ivw_z_stat": np.nan,
+                    "ivw_p_value": np.nan,
+                    "note": "insufficient_group_results",
+                }
+            )
+            continue
+
+        good_weights = 1.0 / good["var_premium_pct"]
+        non_good_weights = 1.0 / non_good["var_premium_pct"]
+
+        good_mean = float(np.average(good["cutoff_premium_pct"], weights=good_weights))
+        non_good_mean = float(np.average(non_good["cutoff_premium_pct"], weights=non_good_weights))
+
+        good_var_mean = float(1.0 / good_weights.sum())
+        non_good_var_mean = float(1.0 / non_good_weights.sum())
+        diff = good_mean - non_good_mean
+        diff_se = math.sqrt(good_var_mean + non_good_var_mean)
+        z_stat = diff / diff_se if diff_se > 0 else np.nan
+        p_value = float(2 * (1 - stats.norm.cdf(abs(z_stat)))) if diff_se > 0 else np.nan
+
+        rows.append(
+            {
+                "bandwidth_m": int(bandwidth_m),
+                "specification": specification,
+                "n_good": int(len(good)),
+                "n_non_good": int(len(non_good)),
+                "ivw_mean_good_premium_pct": good_mean,
+                "ivw_mean_non_good_premium_pct": non_good_mean,
+                "ivw_mean_diff_premium_pct": diff,
+                "ivw_diff_std_err": diff_se,
+                "ivw_z_stat": float(z_stat),
+                "ivw_p_value": p_value,
+                "note": "",
+            }
+        )
+
+    return pd.DataFrame(rows).sort_values(["bandwidth_m", "specification"])
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="School-specific boundary RDD around 1km school cutoffs")
     parser.add_argument(
@@ -422,6 +491,12 @@ def main() -> None:
         group_ttests_df.to_json(orient="records", indent=2)
     )
 
+    ivw_group_df = run_inverse_variance_group_comparison(school_results_df)
+    ivw_group_df.to_csv(output_dir / "school_group_inverse_variance.csv", index=False)
+    (output_dir / "school_group_inverse_variance.json").write_text(
+        ivw_group_df.to_json(orient="records", indent=2)
+    )
+
     summary = {
         "transactions_with_geocoded_addresses": int(transactions["address_key"].nunique()),
         "transaction_rows_used": int(len(transactions)),
@@ -440,6 +515,9 @@ def main() -> None:
     if not group_ttests_df.empty:
         print("\nGood vs non-good school Welch t-tests:")
         print(group_ttests_df.to_string(index=False))
+    if not ivw_group_df.empty:
+        print("\nGood vs non-good school inverse-variance comparison:")
+        print(ivw_group_df.to_string(index=False))
     print(f"Wrote RDD outputs to {output_dir}")
 
 
