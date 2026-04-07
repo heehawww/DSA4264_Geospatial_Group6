@@ -1,0 +1,16 @@
+.DS_Store
+.env
+.git
+.gitignore
+.pytest_cache
+.ruff_cache
+__pycache__
+*.py[cod]
+*.egg-info
+.venv
+venv
+env
+ENV
+build
+dist
+primary_boundaries/cache
