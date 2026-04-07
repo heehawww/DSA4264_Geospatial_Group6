@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=70", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "dsa4264-geospatial-group6"
 version = "0.1.0"
@@ -26,3 +30,6 @@ dependencies = [
     "pydeck>=0.9.1",
     "uvicorn>=0.42.0",
 ]
+
+[tool.setuptools.packages.find]
+include = ["api*", "chatbot*", "hedonic_model*"]
