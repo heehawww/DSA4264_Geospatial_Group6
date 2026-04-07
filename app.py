@@ -49,16 +49,21 @@ st.markdown(
     <style>
     div[data-testid="stChatMessage"] {
         max-width: 100%;
-        overflow-wrap: anywhere;
-        word-break: break-word;
+        overflow-wrap: break-word;
+        word-break: normal;
     }
 
     div[data-testid="stChatMessage"] p,
     div[data-testid="stChatMessage"] li,
     div[data-testid="stChatMessage"] span {
+        overflow-wrap: break-word;
+        word-break: normal;
+        white-space: normal;
+    }
+
+    div[data-testid="stChatMessage"] a {
         overflow-wrap: anywhere;
         word-break: break-word;
-        white-space: normal;
     }
 
     div[data-testid="stChatMessage"] pre,
@@ -77,6 +82,10 @@ def _format_currency(value: float) -> str:
     if pd.isna(value):
         return "N/A"
     return f"S${value:,.0f}"
+
+
+def _render_chat_text(text: str) -> None:
+    st.markdown(text.replace("$", r"\$"))
 
 
 def _escape_tooltip_value(value: object) -> str:
@@ -126,42 +135,18 @@ def get_api_health() -> dict[str, Any]:
     return api_get("/health", timeout=5)
 
 
-def build_api_filter_params(filters: dict[str, Any]) -> dict[str, Any]:
-    params: dict[str, Any] = {}
-    if filters.get("month"):
-        params["month_from"] = filters["month"]
-        params["month_to"] = filters["month"]
-    if filters.get("school_filter") == "yes":
-        params["min_good_school_count_1km"] = 1
-    elif filters.get("school_filter") == "no":
-        params["max_good_school_count_1km"] = 0
-    return params
-
-
-def collect_api_context(user_prompt: str, filters: dict[str, Any]) -> dict[str, Any]:
+def collect_api_context(user_prompt: str) -> dict[str, Any]:
     prompt = user_prompt.lower()
-    resale_params = build_api_filter_params(filters)
     context: dict[str, Any] = {
         "api_base_url": DEFAULT_API_BASE_URL,
-        "active_api_filters": resale_params,
     }
 
     context["metadata"] = api_get("/metadata")
-    context["resales_summary"] = api_get("/resales/summary", resale_params)
+    context["resales_summary"] = api_get("/resales/summary")
 
     if any(word in prompt for word in ["premium", "good school", "school", "1km"]):
-        context["premium_summary"] = api_get("/premiums/summary")
-        context["premium_rows_sample"] = api_get("/premiums", {"limit": 10})
-
-    if any(word in prompt for word in ["coefficient", "ols", "significant", "regression"]):
-        context["ols_coefficients"] = api_get(
-            "/ols/coefficients",
-            {"term": "good_school", "significant_only": False, "limit": 20},
-        )
-
-    if any(word in prompt for word in ["rdd", "causal", "discontinuity", "boundary"]):
-        context["rdd_summary"] = api_get("/rdd/summary")
-        context["rdd_results"] = api_get("/rdd/results", {"limit": 20})
+        context["premium_summary"] = api_get("/town-premiums/summary")
+        context["premium_rows_sample"] = api_get("/town-premiums", {"limit": 10})
 
     if any(word in prompt for word in ["predict", "prediction", "what if", "hypothetical"]):
         context["prediction_schema"] = api_get("/predict/schema")
@@ -170,20 +155,19 @@ def collect_api_context(user_prompt: str, filters: dict[str, Any]) -> dict[str, 
 
 
 def render_api_status() -> None:
-    with st.sidebar:
-        st.header("API")
-        st.caption(f"Base URL: `{DEFAULT_API_BASE_URL}`")
-        if os.getenv("OPENAI_API_KEY"):
-            st.success("Agent key loaded from environment.")
-        else:
-            st.warning("OPENAI_API_KEY is not loaded. Add it to the repo-root `.env` file.")
-        try:
-            health = get_api_health()
-        except ApiClientError:
-            st.warning("API offline. Start FastAPI to enable service-backed chat.")
-            st.code("uvicorn api.main:app --reload", language="bash")
-            return
-        st.success(f"Connected: {health.get('status', 'ok')}")
+    st.subheader("Chatbot service")
+    st.caption(f"API base URL: `{DEFAULT_API_BASE_URL}`")
+    if os.getenv("OPENAI_API_KEY"):
+        st.success("Agent key loaded from environment.")
+    else:
+        st.warning("OPENAI_API_KEY is not loaded. Add it to the repo-root `.env` file.")
+    try:
+        health = get_api_health()
+    except ApiClientError:
+        st.warning("API offline. Start FastAPI to enable service-backed chat.")
+        st.code("uvicorn api.main:app --reload", language="bash")
+        return
+    st.success(f"Connected: {health.get('status', 'ok')}")
 
 
 @st.cache_data(show_spinner=False)
@@ -543,7 +527,7 @@ def fallback_chat_response(
         median_price = summary.get("median_resale_price")
         mean_price = summary.get("mean_resale_price")
         return (
-            "From the API-backed resale summary for the current filters, "
+            "From the API-backed resale summary across the dataset, "
             f"I found {count:,} resale records. The mean resale price is "
             f"{_format_currency(mean_price)} and the median is {_format_currency(median_price)}. "
             "Install `pydantic-ai` and set `OPENAI_API_KEY` for a fuller agent-style explanation."
@@ -608,7 +592,6 @@ def call_agent_with_context(
     return chatbot_agent.run_hdb_agent(
         user_prompt,
         map_context=map_context,
-        active_filters=api_context.get("active_api_filters", {}),
         api_status=api_context,
         conversation=conversation,
         api_base_url=DEFAULT_API_BASE_URL,
@@ -616,9 +599,9 @@ def call_agent_with_context(
 
 
 def render_chatbot(filtered: pd.DataFrame) -> None:
-    st.subheader("Agent chatbot")
+    st.subheader("HDB price assistant")
     st.caption(
-        "Ask questions about the current map, resale aggregates, model artifacts, RDD outputs, or good-school premiums."
+        "Ask plain-language questions about resale prices, towns, school access, or what-if price estimates."
     )
 
     if "chat_messages" not in st.session_state:
@@ -626,48 +609,44 @@ def render_chatbot(filtered: pd.DataFrame) -> None:
             {
                 "role": "assistant",
                 "content": (
-                    "I can use the current map filters plus the FastAPI service to summarize resales, premiums, "
-                    "OLS terms, RDD outputs, and prediction inputs."
+                    "I can help compare resale prices, towns, school access, and what-if price estimates. "
+                    "The map filters only affect the map unless you ask about the current map."
                 ),
             }
         ]
 
-    for message in st.session_state["chat_messages"]:
-        with st.chat_message(message["role"]):
-            st.markdown(message["content"])
+    message_area = st.container(height=560, border=True)
+    with message_area:
+        for message in st.session_state["chat_messages"]:
+            with st.chat_message(message["role"]):
+                _render_chat_text(message["content"])
 
-    user_prompt = st.chat_input("Ask about the filtered predictions")
+    user_prompt = st.chat_input("Ask about prices, towns, school access, or a what-if estimate")
     if not user_prompt:
         return
 
     st.session_state["chat_messages"].append({"role": "user", "content": user_prompt})
-    with st.chat_message("user"):
-        st.markdown(user_prompt)
 
-    with st.chat_message("assistant"):
-        with st.spinner("Gathering map and API context..."):
-            map_context = build_summary_context(filtered)
-            api_context: dict[str, Any] = {}
-            try:
-                api_context = collect_api_context(
-                    user_prompt,
-                    st.session_state.get("active_filters", {}),
-                )
-            except ApiClientError as exc:
-                api_context = {"api_error": str(exc), "api_base_url": DEFAULT_API_BASE_URL}
-                st.warning("FastAPI is not reachable, so I am using only the local map data for this reply.")
+    with st.spinner("Gathering map and API context..."):
+        map_context = build_summary_context(filtered)
+        api_context: dict[str, Any] = {}
+        try:
+            api_context = collect_api_context(user_prompt)
+        except ApiClientError as exc:
+            api_context = {"api_error": str(exc), "api_base_url": DEFAULT_API_BASE_URL}
 
-            try:
-                reply = call_agent_with_context(
-                    map_context,
-                    api_context,
-                    st.session_state["chat_messages"],
-                )
-            except Exception as exc:
-                st.error(f"Agent call failed: {exc}")
-                reply = fallback_chat_response(filtered, user_prompt, api_context)
-            st.markdown(reply)
+        try:
+            reply = call_agent_with_context(
+                map_context,
+                api_context,
+                st.session_state["chat_messages"],
+            )
+        except Exception as exc:
+            reply = fallback_chat_response(filtered, user_prompt, api_context)
+            if "api_error" not in api_context:
+                reply = f"{reply}\n\nAgent call failed: {exc}"
     st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
+    st.rerun()
 
 
 def main() -> None:
@@ -676,15 +655,13 @@ def main() -> None:
         "Explore model-predicted resale prices on the map and ask natural-language questions about the active filter."
     )
 
-    render_api_status()
-
     dataset = build_map_dataset()
     filtered = filter_dataset(dataset)
     filters = st.session_state["active_filters"]
 
-    map_col, chat_col = st.columns([2.35, 1], gap="large")
+    map_tab, chat_tab = st.tabs(["Map", "Chatbot"])
 
-    with map_col:
+    with map_tab:
         st.subheader("Prediction map")
         st.caption(
             f"Showing {len(filtered):,} resale-flat records for {filters['month']}. "
@@ -698,9 +675,10 @@ def main() -> None:
             filters["show_buildings"],
         )
 
-    with chat_col:
-        with st.container(border=True):
-            render_chatbot(filtered)
+    with chat_tab:
+        render_api_status()
+        st.divider()
+        render_chatbot(filtered)
 
 
 if __name__ == "__main__":
