@@ -119,8 +119,8 @@ Default outputs in `hedonic_model/rdd_outputs/`:
 - `school_specific_rdd_coefficients.csv`
 - `school_specific_rdd_skipped.csv`
 - `school_specific_address_signed_distances.csv`
-- `school_group_ttests.csv`
-- `school_group_inverse_variance.csv`
+- `school_group_interaction_results.csv`
+- `school_group_interaction_coefficients.csv`
 - `rdd_summary.json`
 
 The running variable is the signed distance in meters from an HDB address point to each school's `1km` buffer boundary:
@@ -135,9 +135,7 @@ The script reports school-specific results at each bandwidth for:
 
 This is a useful local design, but it is still approximate because the project uses address points rather than exact unit locations.
 
-It also reports:
-- Welch t-tests that compare the distribution of school-level `cutoff_premium_pct` estimates between `good` and `non_good` schools for each bandwidth and specification
-- inverse-variance-weighted group comparisons that place more weight on school-level RDD estimates with smaller standard errors
+It also reports a pooled transaction-level interaction model that directly tests whether the local cutoff premium differs between `good` and `non_good` schools for each bandwidth and specification.
 
 ## Coefficient Trace
 
