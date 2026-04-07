@@ -9,7 +9,7 @@ If you are running locally, you can initialize a Python virtual environment and 
 ```bash
 python -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install .
 ```
 
 ## Run the Frontend
