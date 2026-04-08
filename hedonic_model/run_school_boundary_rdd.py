@@ -13,7 +13,6 @@ import geopandas as gpd
 import numpy as np
 import pandas as pd
 import statsmodels.formula.api as smf
-from scipy import stats
 
 SVY21_EPSG = 3414
 
@@ -267,53 +266,76 @@ def run_school_specific_rdd(
     return results_df, coef_df, skipped_df
 
 
-def run_group_ttests(results_df: pd.DataFrame) -> pd.DataFrame:
+def run_good_school_interaction_rdd(
+    model_df: pd.DataFrame,
+    bandwidths: list[int],
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     rows: list[dict[str, float | int | str]] = []
-    if results_df.empty:
-        return pd.DataFrame()
+    coefficient_tables: list[pd.DataFrame] = []
 
-    for (bandwidth_m, specification), subset in results_df.groupby(["bandwidth_m", "specification"]):
-        good = subset.loc[subset["school_group"] == "good", "cutoff_premium_pct"].dropna()
-        non_good = subset.loc[subset["school_group"] == "non_good", "cutoff_premium_pct"].dropna()
+    for bandwidth_m in bandwidths:
+        local = model_df.loc[model_df["distance_abs_m"] <= bandwidth_m].copy()
+        if local.empty:
+            continue
 
-        if len(good) < 2 or len(non_good) < 2:
+        local["running_km"] = local["signed_distance_m"] / 1000
+        local["treat"] = (local["signed_distance_m"] <= 0).astype(int)
+        local["kernel_weight"] = triangular_weights(local["distance_abs_m"], bandwidth_m)
+        local["good_school"] = local["is_good_school"].astype(int)
+
+        for specification in ("uncontrolled", "controlled"):
+            formula = (
+                "log_resale_price ~ treat + running_km + treat:running_km "
+                "+ treat:good_school + running_km:good_school + treat:running_km:good_school "
+                "+ C(boundary_school_name)"
+            )
+            if specification == "controlled":
+                formula += " + floor_area_sqm + lease_age_years + remaining_lease_years + storey_mid"
+                formula += " + C(town) + C(flat_type) + C(flat_model) + C(month_period)"
+
+            model = smf.wls(formula, data=local, weights=local["kernel_weight"]).fit(cov_type="HC1")
+            coef_table = (
+                model.summary2().tables[1]
+                .reset_index()
+                .rename(columns={"index": "term"})
+                .assign(specification=specification, bandwidth_m=bandwidth_m)
+            )
+            coefficient_tables.append(coef_table)
+
+            base_coef = float(model.params["treat"])
+            base_se = float(model.bse["treat"])
+            good_diff_coef = float(model.params["treat:good_school"])
+            good_diff_se = float(model.bse["treat:good_school"])
+            good_total_coef = base_coef + good_diff_coef
+
+            base_premium_pct = float(math.exp(base_coef) - 1)
+            good_total_premium_pct = float(math.exp(good_total_coef) - 1)
+            diff_mean_price = float(local["resale_price"].mean())
+
             rows.append(
                 {
                     "bandwidth_m": int(bandwidth_m),
                     "specification": specification,
-                    "n_good": int(len(good)),
-                    "n_non_good": int(len(non_good)),
-                    "mean_good_premium_pct": float(good.mean()) if len(good) else np.nan,
-                    "mean_non_good_premium_pct": float(non_good.mean()) if len(non_good) else np.nan,
-                    "mean_diff_premium_pct": (
-                        float(good.mean() - non_good.mean()) if len(good) and len(non_good) else np.nan
-                    ),
-                    "welch_t_stat": np.nan,
-                    "welch_p_value": np.nan,
-                    "note": "insufficient_group_results",
+                    "sample_size": int(len(local)),
+                    "n_good_rows": int(local["good_school"].sum()),
+                    "n_non_good_rows": int((1 - local["good_school"]).sum()),
+                    "non_good_cutoff_coef_log_points": base_coef,
+                    "non_good_cutoff_std_err": base_se,
+                    "non_good_cutoff_premium_pct": base_premium_pct,
+                    "good_school_diff_coef_log_points": good_diff_coef,
+                    "good_school_diff_std_err": good_diff_se,
+                    "good_school_diff_p_value": float(model.pvalues["treat:good_school"]),
+                    "good_school_diff_premium_pct": float(math.exp(good_diff_coef) - 1),
+                    "good_school_diff_sgd_at_local_mean_price": float((math.exp(good_diff_coef) - 1) * diff_mean_price),
+                    "good_school_total_cutoff_premium_pct": good_total_premium_pct,
+                    "local_mean_resale_price": diff_mean_price,
+                    "r_squared": float(model.rsquared),
                 }
             )
-            continue
 
-        t_stat, p_value = stats.ttest_ind(good, non_good, equal_var=False)
-        rows.append(
-            {
-                "bandwidth_m": int(bandwidth_m),
-                "specification": specification,
-                "n_good": int(len(good)),
-                "n_non_good": int(len(non_good)),
-                "mean_good_premium_pct": float(good.mean()),
-                "mean_non_good_premium_pct": float(non_good.mean()),
-                "mean_diff_premium_pct": float(good.mean() - non_good.mean()),
-                "median_good_premium_pct": float(good.median()),
-                "median_non_good_premium_pct": float(non_good.median()),
-                "welch_t_stat": float(t_stat),
-                "welch_p_value": float(p_value),
-                "note": "",
-            }
-        )
-
-    return pd.DataFrame(rows).sort_values(["bandwidth_m", "specification"])
+    results_df = pd.DataFrame(rows).sort_values(["bandwidth_m", "specification"]) if rows else pd.DataFrame()
+    coef_df = pd.concat(coefficient_tables, ignore_index=True) if coefficient_tables else pd.DataFrame()
+    return results_df, coef_df
 
 
 def main() -> None:
@@ -416,10 +438,14 @@ def main() -> None:
         school_results_df.to_json(orient="records", indent=2)
     )
 
-    group_ttests_df = run_group_ttests(school_results_df)
-    group_ttests_df.to_csv(output_dir / "school_group_ttests.csv", index=False)
-    (output_dir / "school_group_ttests.json").write_text(
-        group_ttests_df.to_json(orient="records", indent=2)
+    interaction_results_df, interaction_coef_df = run_good_school_interaction_rdd(
+        school_specific_model_df,
+        bandwidths=args.bandwidths,
+    )
+    interaction_results_df.to_csv(output_dir / "school_group_interaction_results.csv", index=False)
+    interaction_coef_df.to_csv(output_dir / "school_group_interaction_coefficients.csv", index=False)
+    (output_dir / "school_group_interaction_results.json").write_text(
+        interaction_results_df.to_json(orient="records", indent=2)
     )
 
     summary = {
@@ -437,9 +463,9 @@ def main() -> None:
     if not school_results_df.empty:
         print("\nSchool-specific RDD results:")
         print(school_results_df.to_string(index=False))
-    if not group_ttests_df.empty:
-        print("\nGood vs non-good school Welch t-tests:")
-        print(group_ttests_df.to_string(index=False))
+    if not interaction_results_df.empty:
+        print("\nGood vs non-good school interaction RDD:")
+        print(interaction_results_df.to_string(index=False))
     print(f"Wrote RDD outputs to {output_dir}")
 
 

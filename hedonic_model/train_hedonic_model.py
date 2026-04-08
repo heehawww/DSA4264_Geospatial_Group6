@@ -5,10 +5,10 @@ from __future__ import annotations
 
 import argparse
 import json
+import joblib
 import math
 import re
 from pathlib import Path
-import joblib
 
 import numpy as np
 import pandas as pd

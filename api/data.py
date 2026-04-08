@@ -34,7 +34,8 @@ RIDGE_PIPELINE_PATH = DATA_DIR / "ridge_pipeline.pkl"
 RDD_RESULTS_PATH = DATA_DIR / "school_specific_rdd_results.csv"
 RDD_COEFFICIENTS_PATH = DATA_DIR / "school_specific_rdd_coefficients.csv"
 RDD_SKIPPED_PATH = DATA_DIR / "school_specific_rdd_skipped.csv"
-RDD_GROUP_TTESTS_PATH = DATA_DIR / "school_group_ttests.csv"
+RDD_GROUP_COMPARISON_RESULTS_PATH = DATA_DIR / "school_group_interaction_results.csv"
+RDD_GROUP_COMPARISON_COEFFICIENTS_PATH = DATA_DIR / "school_group_interaction_coefficients.csv"
 RDD_SUMMARY_PATH = DATA_DIR / "rdd_summary.json"
 
 TOWN_PREMIUM_RESULTS_PATH = DATA_DIR / "town_premium_results.csv"
@@ -82,7 +83,8 @@ class DataStore:
     rdd_results: pd.DataFrame
     rdd_coefficients: pd.DataFrame
     rdd_skipped: pd.DataFrame
-    rdd_group_ttests: pd.DataFrame
+    rdd_group_comparison_results: pd.DataFrame
+    rdd_group_comparison_coefficients: pd.DataFrame
     rdd_summary: dict[str, Any]
     town_premium_results: pd.DataFrame
     town_premium_skipped: pd.DataFrame
@@ -119,7 +121,10 @@ class DataStore:
         rdd_results = pd.read_csv(RDD_RESULTS_PATH)
         rdd_coefficients = _normalise_statsmodels_columns(pd.read_csv(RDD_COEFFICIENTS_PATH))
         rdd_skipped = pd.read_csv(RDD_SKIPPED_PATH)
-        rdd_group_ttests = pd.read_csv(RDD_GROUP_TTESTS_PATH)
+        rdd_group_comparison_results = pd.read_csv(RDD_GROUP_COMPARISON_RESULTS_PATH)
+        rdd_group_comparison_coefficients = _normalise_statsmodels_columns(
+            pd.read_csv(RDD_GROUP_COMPARISON_COEFFICIENTS_PATH)
+        )
         rdd_summary = _safe_json(RDD_SUMMARY_PATH)
 
         town_premium_results = pd.read_csv(TOWN_PREMIUM_RESULTS_PATH)
@@ -150,7 +155,8 @@ class DataStore:
             rdd_results=rdd_results,
             rdd_coefficients=rdd_coefficients,
             rdd_skipped=rdd_skipped,
-            rdd_group_ttests=rdd_group_ttests,
+            rdd_group_comparison_results=rdd_group_comparison_results,
+            rdd_group_comparison_coefficients=rdd_group_comparison_coefficients,
             rdd_summary=rdd_summary,
             town_premium_results=town_premium_results,
             town_premium_skipped=town_premium_skipped,
@@ -239,7 +245,8 @@ class DataStore:
             "rdd_result_rows": int(len(self.rdd_results)),
             "rdd_coefficient_rows": int(len(self.rdd_coefficients)),
             "rdd_skipped_rows": int(len(self.rdd_skipped)),
-            "rdd_group_ttest_rows": int(len(self.rdd_group_ttests)),
+            "rdd_group_comparison_rows": int(len(self.rdd_group_comparison_results)),
+            "rdd_group_comparison_coefficient_rows": int(len(self.rdd_group_comparison_coefficients)),
             "town_premium_rows": int(len(self.town_premium_results)),
             "town_premium_skipped_rows": int(len(self.town_premium_skipped)),
             "sign_trace_rows": int(len(self.sign_trace)),
