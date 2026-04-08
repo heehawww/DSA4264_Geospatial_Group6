@@ -51,7 +51,8 @@ class MetadataResponse(BaseModel):
     rdd_result_rows: int
     rdd_coefficient_rows: int
     rdd_skipped_rows: int
-    rdd_group_ttest_rows: int
+    rdd_group_comparison_rows: int
+    rdd_group_comparison_coefficient_rows: int
     town_premium_rows: int
     town_premium_skipped_rows: int
     sign_trace_rows: int

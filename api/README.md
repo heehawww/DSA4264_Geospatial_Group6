@@ -22,7 +22,7 @@ The API is organized around the final analytical surfaces:
 - [routers/system.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/system.py): root, health, metadata
 - [routers/resales.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/resales.py): historical resale rows and summaries
 - [routers/model.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/model.py): final hedonic model metrics, feature importance, coefficients
-- [routers/rdd.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/rdd.py): school-specific RDD results, coefficients, skipped schools, t-tests
+- [routers/rdd.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/rdd.py): school-specific RDD results, coefficients, skipped schools, and group-comparison outputs
 - [routers/town_premiums.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/town_premiums.py): town-level premium outputs
 - [routers/diagnostics.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/diagnostics.py): coefficient sign trace
 - [routers/benchmarks.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/benchmarks.py): model benchmark results
@@ -43,7 +43,8 @@ Current datasets used by the finalized API:
 - `data/school_specific_rdd_results.csv`
 - `data/school_specific_rdd_coefficients.csv`
 - `data/school_specific_rdd_skipped.csv`
-- `data/school_group_ttests.csv`
+- `data/school_group_interaction_results.csv`
+- `data/school_group_interaction_coefficients.csv`
 - `data/rdd_summary.json`
 - `data/town_premium_results.csv`
 - `data/town_premium_skipped.csv`
@@ -292,15 +293,25 @@ Use for:
 - inspecting the full coefficient tables behind school-specific RDD fits
 - filtering by school, specification, bandwidth, or term
 
-### `GET /rdd/group-ttests`
+### `GET /rdd/group-comparison`
 
 Source:
 
-- `data/school_group_ttests.csv`
+- `data/school_group_interaction_results.csv`
 
 This is the endpoint for answering:
 
 - whether good schools have significantly different local premiums than non-good schools
+
+The comparison is based on a pooled transaction-level interaction model, not on t-tests across school-level estimates.
+
+### `GET /rdd/group-comparison/coefficients`
+
+Source:
+
+- `data/school_group_interaction_coefficients.csv`
+
+This endpoint exposes the full coefficient table for the pooled interaction model used in the group comparison.
 
 ### `GET /rdd/skipped`
 
@@ -416,7 +427,7 @@ Use:
 - `/resales/raw` and `/resales/summary` for observed historical data
 - `/model/metrics` and `/model/feature-importance` for prediction quality and model justification
 - `/rdd/results` for school-specific RDD main results
-- `/rdd/group-ttests` for good-vs-non-good comparison
+- `/rdd/group-comparison` for good-vs-non-good comparison
 - `/rdd/skipped` for coverage and feasibility explanation
 - `/town-premiums` for town-level premium estimates
 - `/diagnostics/sign-trace` for coefficient-sign diagnostics

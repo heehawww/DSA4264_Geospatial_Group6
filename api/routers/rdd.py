@@ -136,13 +136,13 @@ def get_rdd_coefficients(
     }
 
 
-@router.get("/group-ttests", response_model=TabularResponse, summary="Good vs non-good school comparison")
-def get_rdd_group_ttests(
+@router.get("/group-comparison", response_model=TabularResponse, summary="Good vs non-good school interaction comparison")
+def get_rdd_group_comparison(
     specification: str | None = Query(default=None),
     bandwidth_m: int | None = Query(default=None),
     store: DataStore = Depends(get_store),
 ) -> TabularResponse:
-    df = store.rdd_group_ttests.copy()
+    df = store.rdd_group_comparison_results.copy()
     if specification:
         df = df.loc[df["specification"].astype(str).str.lower() == specification.lower()]
     if bandwidth_m is not None:
@@ -153,6 +153,34 @@ def get_rdd_group_ttests(
         "filters": {
             "specification": specification,
             "bandwidth_m": bandwidth_m,
+        },
+        "rows": df.to_dict(orient="records"),
+    }
+
+
+@router.get("/group-comparison/coefficients", response_model=TabularResponse, summary="Interaction-model coefficient table")
+def get_rdd_group_comparison_coefficients(
+    specification: str | None = Query(default=None),
+    bandwidth_m: int | None = Query(default=None),
+    term: str | None = Query(default=None),
+    limit: int = Query(default=200, ge=1, le=5000),
+    store: DataStore = Depends(get_store),
+) -> TabularResponse:
+    df = store.rdd_group_comparison_coefficients.copy()
+    if specification:
+        df = df.loc[df["specification"].astype(str).str.lower() == specification.lower()]
+    if bandwidth_m is not None:
+        df = df.loc[pd.to_numeric(df["bandwidth_m"], errors="coerce") == bandwidth_m]
+    if term:
+        df = df.loc[df["term"].astype(str).str.contains(term, case=False, na=False)]
+    df = df.head(limit).replace({np.nan: None})
+    return {
+        "count": int(len(df)),
+        "filters": {
+            "specification": specification,
+            "bandwidth_m": bandwidth_m,
+            "term": term,
+            "limit": limit,
         },
         "rows": df.to_dict(orient="records"),
     }
