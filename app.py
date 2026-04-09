@@ -452,8 +452,13 @@ def load_good_school_lookup() -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def load_school_rdd_premium_lookup() -> dict[str, float]:
-    rdd_path = REPO_ROOT / "data/school_specific_rdd_results.csv"
-    if not rdd_path.exists():
+    rdd_path_candidates = [
+        REPO_ROOT / "data/api/school_specific_rdd_results.csv",
+        REPO_ROOT / "data/school_specific_rdd_results.csv",
+        REPO_ROOT / "hedonic_model/rdd_outputs/school_specific_rdd_results.csv",
+    ]
+    rdd_path = _find_first_existing_path(rdd_path_candidates)
+    if rdd_path is None:
         return {}
     rdd = pd.read_csv(rdd_path)
     filtered = rdd.loc[
