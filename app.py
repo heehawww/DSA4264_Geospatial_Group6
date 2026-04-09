@@ -108,6 +108,30 @@ def _escape_tooltip_value(value: object) -> str:
     )
 
 
+def _to_pydeck_records(frame: pd.DataFrame) -> list[dict[str, Any]]:
+    def normalize_value(value: Any) -> Any:
+        if isinstance(value, (list, dict, tuple)):
+            return value
+        if pd.isna(value):
+            return None
+        if isinstance(value, np.generic):
+            return value.item()
+        return value
+
+    normalized = frame.copy()
+    for column in normalized.columns:
+        normalized[column] = normalized[column].map(normalize_value)
+    return normalized.to_dict(orient="records")
+
+
+def _get_selected_school_name() -> str | None:
+    selection_state = st.session_state.get("prediction_map", {})
+    selected_objects = selection_state.get("selection", {}).get("objects", {}).get("school_points", [])
+    if not selected_objects:
+        return None
+    return selected_objects[0].get("school_name")
+
+
 def _resolve_first_existing_path(candidates: list[Path], label: str) -> Path:
     for candidate in candidates:
         if candidate.exists():
@@ -328,6 +352,62 @@ def load_school_buffers(buffer_distance_km: int) -> dict[str, Any]:
     return json.loads(buffers.to_json())
 
 
+def filter_school_buffers(buffer_distance_km: int, school_name: str) -> dict[str, Any]:
+    buffers = load_school_buffers(buffer_distance_km)
+    if not school_name:
+        return buffers
+    filtered_features = [
+        feature
+        for feature in buffers.get("features", [])
+        if feature.get("properties", {}).get("school_name") == school_name
+    ]
+    return {
+        **buffers,
+        "features": filtered_features,
+    }
+
+
+@st.cache_data(show_spinner=False)
+def load_school_points() -> list[dict[str, Any]]:
+    schools = gpd.read_file(BUFFER_1KM_PATH)[
+        ["school_name", "is_good_school", "school_tier", "geometry"]
+    ].copy()
+    if schools.crs and schools.crs.to_string() != "EPSG:4326":
+        schools = schools.to_crs(4326)
+    school_points = schools.geometry.representative_point()
+    schools["latitude"] = school_points.y
+    schools["longitude"] = school_points.x
+    schools = schools.dropna(subset=["latitude", "longitude"]).drop_duplicates("school_name")
+    school_mask = schools["is_good_school"].astype(str).str.strip().str.lower().isin({"true", "1", "yes"})
+    schools["point_color"] = school_mask.map(
+        lambda is_good: [34, 139, 34, 220] if is_good else [180, 110, 35, 220]
+    )
+    schools["school_type_label"] = school_mask.map(
+        lambda is_good: "Good school" if is_good else "Other primary school"
+    )
+    schools["school_tier"] = schools["school_tier"].fillna("Unknown")
+    schools["tooltip_html"] = schools.apply(
+        lambda row: (
+            f"<b>{_escape_tooltip_value(row['school_name'])}</b><br/>"
+            f"Tier: {_escape_tooltip_value(row['school_tier'])}"
+        ),
+        axis=1,
+    )
+    return _to_pydeck_records(
+        schools[
+            [
+                "school_name",
+                "school_tier",
+                "latitude",
+                "longitude",
+                "point_color",
+                "school_type_label",
+                "tooltip_html",
+            ]
+        ]
+    )
+
+
 @st.cache_data(show_spinner=False)
 def load_hdb_buildings() -> dict[str, Any]:
     buildings = gpd.read_file(BUILDINGS_PATH)
@@ -340,7 +420,6 @@ def load_hdb_buildings() -> dict[str, Any]:
     buildings["tooltip_html"] = buildings.apply(
         lambda row: (
             f"<b>HDB Block {_escape_tooltip_value(row['BLK_NO'])}</b><br/>"
-            f"Matched transactions: {_escape_tooltip_value(row['matched_txn_count'])}<br/>"
             f"Average resale price: {_escape_tooltip_value(row['building_avg_price_label'])}"
         ),
         axis=1,
@@ -369,6 +448,35 @@ def load_good_school_lookup() -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def load_school_rdd_premium_lookup() -> dict[str, float]:
+    rdd_path = REPO_ROOT / "data/school_specific_rdd_results.csv"
+    if not rdd_path.exists():
+        return {}
+    rdd = pd.read_csv(rdd_path)
+    filtered = rdd.loc[
+        (rdd["specification"].astype(str).str.strip().str.lower() == "controlled")
+        & (pd.to_numeric(rdd["bandwidth_m"], errors="coerce") == 100)
+    ].copy()
+    filtered["boundary_school_name"] = filtered["boundary_school_name"].astype(str).str.strip().str.upper()
+    filtered["cutoff_premium_pct"] = pd.to_numeric(filtered["cutoff_premium_pct"], errors="coerce")
+    filtered = filtered.dropna(subset=["boundary_school_name", "cutoff_premium_pct"])
+    return dict(zip(filtered["boundary_school_name"], filtered["cutoff_premium_pct"], strict=False))
+
+
+def _estimate_rdd_premium_pct(good_school_names: object, school_rdd_lookup: dict[str, float]) -> float:
+    if not isinstance(good_school_names, str) or not good_school_names.strip():
+        return np.nan
+    matched_premiums = [
+        school_rdd_lookup[name.strip().upper()]
+        for name in good_school_names.split(",")
+        if name.strip().upper() in school_rdd_lookup
+    ]
+    if not matched_premiums:
+        return np.nan
+    return float(np.mean(matched_premiums))
+
+
+@st.cache_data(show_spinner=False)
 def build_map_dataset() -> pd.DataFrame:
     predictions = load_prediction_dataset()
     points = load_points()
@@ -380,16 +488,11 @@ def build_map_dataset() -> pd.DataFrame:
     merged["display_price"] = actual_prices.fillna(predicted_prices)
     merged["display_price_type"] = np.where(actual_prices.notna(), "Price", "Predicted price")
     merged["price_gap_pct"] = merged["prediction_error"] / merged["predicted_resale_price"]
-    metrics = load_model_metrics()
-    premium_pct = pd.to_numeric(metrics.get("good_school_within_1km_premium_pct_from_ols"), errors="coerce")
-    if pd.isna(premium_pct):
-        merged["premium_price"] = np.nan
-    else:
-        merged["premium_price"] = np.where(
-            merged["good_school_within_1km"] == 1,
-            merged["predicted_resale_price"] * float(premium_pct),
-            np.nan,
-        )
+    school_rdd_lookup = load_school_rdd_premium_lookup()
+    merged["school_rdd_premium_pct"] = merged["good_school_names_1km"].map(
+        lambda value: _estimate_rdd_premium_pct(value, school_rdd_lookup)
+    )
+    merged["premium_price"] = merged["predicted_resale_price"] * merged["school_rdd_premium_pct"]
     return merged
 
 
@@ -400,8 +503,6 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
     selected_month = st.sidebar.selectbox("Month", months, index=len(months) - 1)
     split = st.sidebar.selectbox("Dataset split", ["all", "train", "test"])
     school_filter = st.sidebar.selectbox("Good school within 1km", ["all", "yes", "no"])
-    show_school_1km = st.sidebar.toggle("Show school 1km boundaries", value=True)
-    show_school_2km = st.sidebar.toggle("Show school 2km boundaries", value=True)
     show_buildings = st.sidebar.toggle("Show HDB building outlines", value=True)
 
     filtered = dataset.loc[dataset["month"] == selected_month].copy()
@@ -417,8 +518,6 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
         "split": split,
         "school_filter": school_filter,
         "metric": "display_price",
-        "show_school_1km": show_school_1km,
-        "show_school_2km": show_school_2km,
         "show_buildings": show_buildings,
     }
     return filtered
@@ -426,26 +525,32 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
 
 def add_color_columns(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
     colored = frame.copy()
-    metric_values = pd.to_numeric(colored[metric], errors="coerce").fillna(0)
-    high = max(metric_values.quantile(0.95), 1)
-    scaled = metric_values.clip(0, high) / high
-    colored["fill_color"] = scaled.apply(
-        lambda value: [
-            int(34 + value * 180),
-            int(82 + value * 90),
-            int(46 + value * 40),
-            180,
-        ]
+    metric_values = pd.to_numeric(colored["premium_price"], errors="coerce")
+    colored["has_flat_premium"] = metric_values.notna()
+    colored["fill_color"] = colored["has_flat_premium"].map(
+        lambda has_premium: [214, 51, 132, 220] if has_premium else [244, 182, 213, 150]
     )
-    colored["radius"] = 90
+    colored["radius"] = 28
     return colored
+
+
+def render_map_legend() -> None:
+    st.markdown(
+        """
+        <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin:0.25rem 0 0.75rem 0; font-size:0.92rem;">
+          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#d63384; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Flat premium: yes</span>
+          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#f4b6d5; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Flat premium: no</span>
+          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#228b22; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Good school</span>
+          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#b46e23; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Other school</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def render_map(
     filtered: pd.DataFrame,
     metric: str,
-    show_school_1km: bool,
-    show_school_2km: bool,
     show_buildings: bool,
 ) -> None:
     if filtered.empty:
@@ -472,15 +577,19 @@ def render_map(
     )
     if len(points) > 12000:
         points = points.sample(12000, random_state=42)
+    point_records = _to_pydeck_records(points)
 
     tooltip = {"html": "{tooltip_html}"}
 
+    selected_school_name = _get_selected_school_name()
+
     layers: list[pdk.Layer] = []
-    if show_school_2km:
+    if selected_school_name:
         layers.append(
             pdk.Layer(
                 "GeoJsonLayer",
-                load_school_buffers(2),
+                filter_school_buffers(2, selected_school_name),
+                id="school_boundary_2km",
                 stroked=True,
                 filled=True,
                 get_fill_color=[121, 169, 237, 18],
@@ -490,11 +599,11 @@ def render_map(
                 auto_highlight=True,
             )
         )
-    if show_school_1km:
         layers.append(
             pdk.Layer(
                 "GeoJsonLayer",
-                load_school_buffers(1),
+                filter_school_buffers(1, selected_school_name),
+                id="school_boundary_1km",
                 stroked=True,
                 filled=True,
                 get_fill_color=[247, 201, 72, 32],
@@ -504,11 +613,27 @@ def render_map(
                 auto_highlight=True,
             )
         )
+    layers.append(
+            pdk.Layer(
+                "ScatterplotLayer",
+                data=load_school_points(),
+                id="school_points",
+            get_position="[longitude, latitude]",
+            get_fill_color="point_color",
+            get_radius=45,
+            pickable=True,
+            opacity=0.95,
+            stroked=True,
+            get_line_color=[255, 255, 255, 220],
+            line_width_min_pixels=1,
+        )
+    )
     if show_buildings:
         layers.append(
             pdk.Layer(
                 "GeoJsonLayer",
                 load_hdb_buildings(),
+                id="hdb_buildings",
                 stroked=True,
                 filled=False,
                 get_line_color=[66, 66, 66, 90],
@@ -520,7 +645,8 @@ def render_map(
     layers.append(
         pdk.Layer(
             "ScatterplotLayer",
-            data=points,
+            data=point_records,
+            id="resale_flats",
             get_position="[longitude, latitude]",
             get_fill_color="fill_color",
             get_radius="radius",
@@ -545,6 +671,9 @@ def render_map(
             tooltip=tooltip,
         ),
         use_container_width=True,
+        on_select="rerun",
+        selection_mode="single-object",
+        key="prediction_map",
     )
 
 
@@ -739,13 +868,13 @@ def main() -> None:
         st.subheader("Prediction map")
         st.caption(
             f"Showing {len(filtered):,} resale-flat records for {filters['month']}. "
-            "Hover a unit to see actual resale price when available, otherwise predicted price."
+            "Hover a unit to see actual resale price when available, otherwise predicted price. "
+            "Click a school dot to reveal that school's 1km and 2km boundaries."
         )
+        render_map_legend()
         render_map(
             filtered,
             filters["metric"],
-            filters["show_school_1km"],
-            filters["show_school_2km"],
             filters["show_buildings"],
         )
 
