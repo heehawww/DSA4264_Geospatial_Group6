@@ -427,25 +427,17 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
 def add_color_columns(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
     colored = frame.copy()
     metric_values = pd.to_numeric(colored[metric], errors="coerce").fillna(0)
-    if metric == "premium_price":
-        max_abs = max(metric_values.abs().quantile(0.95), 1)
-        clipped = metric_values.clip(-max_abs, max_abs) / max_abs
-        colored["fill_color"] = clipped.apply(
-            lambda value: [35, 109, 177, 180] if value >= 0 else [214, 69, 65, 180]
-        )
-        colored["radius"] = 75 + metric_values.abs().clip(0, max_abs).fillna(0) / max_abs * 125
-    else:
-        high = max(metric_values.quantile(0.95), 1)
-        scaled = metric_values.clip(0, high) / high
-        colored["fill_color"] = scaled.apply(
-            lambda value: [
-                int(34 + value * 180),
-                int(82 + value * 90),
-                int(46 + value * 40),
-                180,
-            ]
-        )
-        colored["radius"] = 70 + scaled * 140
+    high = max(metric_values.quantile(0.95), 1)
+    scaled = metric_values.clip(0, high) / high
+    colored["fill_color"] = scaled.apply(
+        lambda value: [
+            int(34 + value * 180),
+            int(82 + value * 90),
+            int(46 + value * 40),
+            180,
+        ]
+    )
+    colored["radius"] = 90
     return colored
 
 
