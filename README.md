@@ -74,6 +74,29 @@ This means:
 
 If you are setting up the project on a new machine, you should recreate the local `data/` directory and place the required files into the correct subfolders before running the pipeline, the API, or the frontend.
 
+## Dataset Sources
+
+The `data/` directory is not committed, so collaborators need to download the required source files locally and place them into the appropriate working folders before running the pipelines.
+
+### Geospatial Data Used
+
+| Feature | Description | Link |
+|---|---|---|
+| MRT Station Exits | A GeoJSON that provides vector coordinates of MRT station exits in Singapore. This is joined with a separate dataset containing MRT/LRT line information. | MRT locations: [data.gov.sg MRT dataset](https://data.gov.sg/datasets?query=MRT&resultId=d_b39d3a0871985372d7e1637193335da5) |
+| MRT Lines | Dataset used to enrich MRT stations with line information. | [Kaggle MRT/LRT stations in Singapore](https://www.kaggle.com/datasets/lzytim/full-list-of-mrt-and-lrt-stations-in-singapore) |
+| Bus Stops | A GeoJSON that provides vector coordinates of bus stop locations in Singapore. | [data.gov.sg bus stop locations](https://data.gov.sg/datasets/d_3f172c6feb3f4f92a2f47d93eed2908a/view) |
+| Shopping Malls | A dataset that provides vector coordinates of shopping mall locations. | [Kaggle shopping mall coordinates](https://www.kaggle.com/datasets/karthikgangula/shopping-mall-coordinates) |
+| Supermarkets | A GeoJSON that provides vector coordinates of supermarket locations in Singapore. | [data.gov.sg supermarket locations](https://data.gov.sg/datasets/d_cac2c32f01960a3ad7202a99c27268a0/view) |
+| Hawker Centres | A GeoJSON that provides vector coordinates of NEA market and food centre locations in Singapore. | [data.gov.sg hawker centre locations](https://data.gov.sg/datasets/d_a57a245b3cf3ec76ad36d55393a16e97/view) |
+| Parks | A GeoJSON that provides vector coordinates of parks in Singapore. | [data.gov.sg parks dataset](https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view) |
+| URA Master Plan | A GeoJSON layer that provides vectorised land parcel designation. | [data.gov.sg URA Master Plan dataset](https://data.gov.sg/datasets?query=URA+master&resultId=d_90d86daa5bfaa371668b84fa5f01424f) |
+| HDB Existing Buildings | A GeoJSON that provides vector objects for built HDB buildings. | [data.gov.sg HDB existing buildings dataset](https://data.gov.sg/datasets?query=HDB+building&resultId=d_16b157c52ed637edd6ba1232e026258d) |
+
+These source datasets are primarily used in the feature-engineering stage. After downloading them, place them into the local working locations expected by the feature-engineering scripts, and then sync the resulting canonical outputs into:
+
+- `data/feature_engineering/outputs/`
+- `data/api/` for any final artifacts that the API must serve
+
 ## Running The Project By Module
 
 Use the following modules in order, depending on what you need to regenerate.
