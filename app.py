@@ -500,30 +500,11 @@ def build_map_dataset() -> pd.DataFrame:
 
 
 def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
-    months = sorted(dataset["month"].dropna().unique().tolist())
-
-    st.sidebar.header("Filters")
-    selected_month = st.sidebar.selectbox("Month", months, index=len(months) - 1)
-    split = st.sidebar.selectbox("Dataset split", ["all", "train", "test"])
-    school_filter = st.sidebar.selectbox("Good school within 1km", ["all", "yes", "no"])
-    show_buildings = st.sidebar.toggle("Show HDB building outlines", value=True)
-
-    filtered = dataset.loc[dataset["month"] == selected_month].copy()
-    if split != "all":
-        filtered = filtered.loc[filtered["dataset_split"] == split].copy()
-    if school_filter == "yes":
-        filtered = filtered.loc[filtered["good_school_within_1km"] == 1].copy()
-    elif school_filter == "no":
-        filtered = filtered.loc[filtered["good_school_within_1km"] == 0].copy()
-
     st.session_state["active_filters"] = {
-        "month": selected_month,
-        "split": split,
-        "school_filter": school_filter,
         "metric": "display_price",
-        "show_buildings": show_buildings,
+        "show_buildings": True,
     }
-    return filtered
+    return dataset.copy()
 
 
 def add_color_columns(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
@@ -557,7 +538,7 @@ def render_map(
     show_buildings: bool,
 ) -> None:
     if filtered.empty:
-        st.warning("No rows match the current filters.")
+        st.warning("No rows are available to display on the map.")
         return
 
     points = add_color_columns(filtered, metric)
@@ -842,7 +823,7 @@ def render_chatbot(filtered: pd.DataFrame) -> None:
                 "role": "assistant",
                 "content": (
                     "I can help compare resale prices, towns, school access, and what-if price estimates. "
-                    "The map filters only affect the map unless you ask about the current map."
+                    "I can also use the current map view as context if you ask about it."
                 ),
             }
         ]
@@ -882,7 +863,7 @@ def render_chatbot(filtered: pd.DataFrame) -> None:
 def main() -> None:
     st.title("HDB Hedonic Model Explorer")
     st.caption(
-        "Explore model-predicted resale prices on the map and ask natural-language questions about the active filter."
+        "Explore model-predicted resale prices on the map and ask natural-language questions about the current view."
     )
 
     dataset = build_map_dataset()
@@ -894,7 +875,7 @@ def main() -> None:
     with map_tab:
         st.subheader("Prediction map")
         st.caption(
-            f"Showing {len(filtered):,} resale-flat records for {filters['month']}. "
+            f"Showing {len(filtered):,} resale-flat records across all available months. "
             "Hover a unit to see actual resale price when available, otherwise predicted price. "
             "Click a school dot to reveal that school's 1km and 2km boundaries."
         )
