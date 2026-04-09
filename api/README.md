@@ -20,6 +20,7 @@ The API is organized around the final analytical surfaces:
 - [dependencies.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/dependencies.py): shared dependency accessors
 - [schemas.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/schemas.py): Pydantic request and response models
 - [routers/system.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/system.py): root, health, metadata
+- [routers/schools.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/schools.py): good primary schools linked to towns
 - [routers/resales.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/resales.py): historical resale rows and summaries
 - [routers/model.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/model.py): final hedonic model metrics, feature importance, coefficients
 - [routers/rdd.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/api/routers/rdd.py): school-specific RDD results, coefficients, skipped schools, and group-comparison outputs
@@ -52,6 +53,8 @@ Current datasets used by the finalized API:
 - `data/api/benchmark_results.csv`
 - `data/api/benchmark_results.json`
 - `data/api/benchmark_metadata.json`
+- `data/api/good_primary_schools.csv`
+- `data/api/school_specific_address_signed_distances.csv`
 
 The raw resale API uses `data/api/resale_flat_prices.csv` as the current raw resale source.
 
@@ -79,6 +82,24 @@ Provides the high-level API state:
 - benchmark metadata
 
 Use this first if the agent or frontend needs to inspect what is currently loaded.
+
+## Schools
+
+### `GET /schools/good`
+
+Returns good primary schools linked to a town using:
+
+- `data/api/good_primary_schools.csv`
+- `data/api/school_specific_address_signed_distances.csv`
+- `data/api/resale_flats_with_school_buffer_counts_with_walkability.csv`
+
+Use this for:
+
+- listing good primary schools associated with a town
+- identifying which good schools appear in the modeled resale feature coverage for that town
+- lightweight school discovery for the frontend or agent layer
+
+This endpoint is derived by linking good-school join keys to address-level signed-distance coverage and then aggregating the covered addresses and transactions by town and school.
 
 ## Resales
 

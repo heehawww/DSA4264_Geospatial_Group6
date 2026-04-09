@@ -84,7 +84,14 @@ Use:
 These endpoints are for observed historical resale records and curated resale summaries.
 They are not generic engineered-feature analytics endpoints.
 
-2. Hedonic model quality and justification
+2. Good primary school lookup
+Use:
+- GET /schools/good
+
+This endpoint returns good primary schools linked to a town using address-level coverage in the engineered feature dataset.
+Use it for school discovery and town-linked school lookup, not for premium estimation.
+
+3. Hedonic model quality and justification
 Use:
 - GET /model/metrics
 - GET /model/feature-importance
@@ -94,7 +101,7 @@ These endpoints answer:
 - why the final predictive model was chosen
 - which variables are most important in the final predictive model
 
-3. Hedonic model interpretation
+4. Hedonic model interpretation
 Use:
 - GET /model/coefficients
 - GET /model/coefficients/{term_name}
@@ -102,7 +109,7 @@ Use:
 These endpoints answer questions about interpretable OLS association terms in the hedonic model.
 They do not by themselves provide school-specific local premium estimates.
 
-4. Hypothetical model prediction
+5. Hypothetical model prediction
 Use:
 - GET /predict/schema
 - POST /predict
@@ -111,7 +118,7 @@ This is for model inference on a user-provided or partially defaulted flat speci
 It is not historical lookup.
 It is not a direct observed market fact.
 
-5. School-specific local premium outputs
+6. School-specific local premium outputs
 Use:
 - GET /rdd/summary
 - GET /rdd/schools
@@ -123,7 +130,7 @@ Use:
 These endpoints come from the school-specific local linear RDD workflow around each school's 1km cutoff.
 They answer questions about local premiums around specific schools, sample sizes, confidence intervals, and skipped schools.
 
-6. Good-vs-non-good comparison outputs
+7. Good-vs-non-good comparison outputs
 Use:
 - GET /rdd/group-comparison
 - GET /rdd/group-comparison/coefficients
@@ -132,7 +139,7 @@ These endpoints answer whether local cutoff premiums differ between good and non
 They are not t-tests.
 They are not school-by-school listings.
 
-7. Town-level premium outputs
+8. Town-level premium outputs
 Use:
 - GET /town-premiums/summary
 - GET /town-premiums
@@ -142,14 +149,14 @@ Use:
 These endpoints answer town-level premium questions.
 They are not school-specific RDD endpoints.
 
-8. Diagnostic outputs
+9. Diagnostic outputs
 Use:
 - GET /diagnostics/sign-trace
 
 This endpoint is for explaining how the school-related coefficient changes as controls are added.
 It is an internal interpretive/diagnostic surface, not a historical resale endpoint.
 
-9. Benchmark outputs
+10. Benchmark outputs
 Use:
 - GET /benchmarks/summary
 - GET /benchmarks/results
@@ -259,6 +266,7 @@ TOOL SELECTION EXAMPLES
 Use these as routing anchors:
 - "What was the median resale price in Tampines?" -> /resales/summary
 - "Show me resale records in Bedok" -> /resales/raw
+- "Which good primary schools are linked to Bishan?" -> /schools/good
 - "How well does the final model perform?" -> /model/metrics
 - "Which features matter most?" -> /model/feature-importance
 - "What is the coefficient on good_school_within_1km?" -> /model/coefficients/{term_name}
@@ -347,6 +355,7 @@ def build_hdb_agent(model_name: str | None = None):
         return {
             "metadata": ctx.deps.api.get("/metadata"),
             "resales_schema": ctx.deps.api.get("/resales/schema"),
+            "predict_schema": ctx.deps.api.get("/predict/schema"),
         }
 
     @agent.tool
@@ -428,6 +437,164 @@ def build_hdb_agent(model_name: str | None = None):
                 "limit": max(1, min(limit, 200)),
             },
         )
+
+    @agent.tool
+    def query_model_outputs(
+        ctx: RunContext[HDBAgentDeps],
+        include_metrics: bool = True,
+        include_feature_importance: bool = False,
+        coefficient_term: str | None = None,
+        significant_only: bool = False,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return model metrics, feature importance, and coefficient information."""
+        result: dict[str, Any] = {}
+        if include_metrics:
+            result["metrics"] = ctx.deps.api.get("/model/metrics")
+        if include_feature_importance:
+            result["feature_importance"] = ctx.deps.api.get(
+                "/model/feature-importance",
+                {"limit": max(1, min(limit, 1000))},
+            )
+        if coefficient_term:
+            result["coefficient"] = ctx.deps.api.get(f"/model/coefficients/{coefficient_term}")
+        else:
+            result["coefficients"] = ctx.deps.api.get(
+                "/model/coefficients",
+                {
+                    "significant_only": significant_only,
+                    "limit": max(1, min(limit, 1000)),
+                },
+            )
+        return result
+
+    @agent.tool
+    def query_rdd_outputs(
+        ctx: RunContext[HDBAgentDeps],
+        school_name: str | None = None,
+        school_group: str | None = None,
+        specification: str | None = None,
+        bandwidth_m: int | None = None,
+        include_summary: bool = False,
+        include_school_index: bool = False,
+        include_coefficients: bool = False,
+        include_skipped: bool = False,
+        reason: str | None = None,
+        term: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return school-specific RDD outputs, coverage rows, coefficient tables, or skipped rows."""
+        result: dict[str, Any] = {}
+        if include_summary:
+            result["summary"] = ctx.deps.api.get("/rdd/summary")
+        if include_school_index:
+            result["schools"] = ctx.deps.api.get("/rdd/schools")
+        if include_skipped:
+            result["skipped"] = ctx.deps.api.get(
+                "/rdd/skipped",
+                {
+                    "school_name": school_name,
+                    "school_group": school_group,
+                    "reason": reason,
+                    "bandwidth_m": bandwidth_m,
+                },
+            )
+            return result
+        if include_coefficients:
+            result["coefficients"] = ctx.deps.api.get(
+                "/rdd/coefficients",
+                {
+                    "school_name": school_name,
+                    "school_group": school_group,
+                    "specification": specification,
+                    "bandwidth_m": bandwidth_m,
+                    "term": term,
+                    "limit": max(1, min(limit, 5000)),
+                },
+            )
+            return result
+        if school_name:
+            result["results"] = ctx.deps.api.get(
+                f"/rdd/results/{school_name}",
+                {
+                    "specification": specification,
+                    "bandwidth_m": bandwidth_m,
+                },
+            )
+            return result
+        result["results"] = ctx.deps.api.get(
+            "/rdd/results",
+            {
+                "school_name": school_name,
+                "school_group": school_group,
+                "specification": specification,
+                "bandwidth_m": bandwidth_m,
+                "limit": max(1, min(limit, 5000)),
+            },
+        )
+        return result
+
+    @agent.tool
+    def query_rdd_group_comparison(
+        ctx: RunContext[HDBAgentDeps],
+        specification: str | None = None,
+        bandwidth_m: int | None = None,
+        include_coefficients: bool = False,
+        term: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return pooled good-vs-non-good comparison results or coefficient rows."""
+        result = {
+            "comparison": ctx.deps.api.get(
+                "/rdd/group-comparison",
+                {
+                    "specification": specification,
+                    "bandwidth_m": bandwidth_m,
+                },
+            )
+        }
+        if include_coefficients:
+            result["coefficients"] = ctx.deps.api.get(
+                "/rdd/group-comparison/coefficients",
+                {
+                    "specification": specification,
+                    "bandwidth_m": bandwidth_m,
+                    "term": term,
+                    "limit": max(1, min(limit, 5000)),
+                },
+            )
+        return result
+
+    @agent.tool
+    def query_diagnostics_and_benchmarks(
+        ctx: RunContext[HDBAgentDeps],
+        include_sign_trace: bool = False,
+        include_benchmark_summary: bool = False,
+        include_benchmark_results: bool = False,
+        include_benchmark_best: bool = False,
+        include_benchmark_metadata: bool = False,
+        benchmark_variant: str | None = None,
+        limit: int = 20,
+    ) -> dict[str, Any]:
+        """Return diagnostic sign-trace rows and benchmark outputs."""
+        result: dict[str, Any] = {}
+        if include_sign_trace:
+            result["sign_trace"] = ctx.deps.api.get("/diagnostics/sign-trace")
+        if include_benchmark_summary:
+            result["benchmark_summary"] = ctx.deps.api.get("/benchmarks/summary")
+        if include_benchmark_results:
+            result["benchmark_results"] = ctx.deps.api.get(
+                "/benchmarks/results",
+                {
+                    "variant": benchmark_variant,
+                    "limit": max(1, min(limit, 1000)),
+                },
+            )
+        if include_benchmark_best:
+            result["benchmark_best"] = ctx.deps.api.get("/benchmarks/best")
+        if include_benchmark_metadata:
+            result["benchmark_metadata"] = ctx.deps.api.get("/benchmarks/metadata")
+        return result
 
     @agent.tool
     def predict_resale_price(

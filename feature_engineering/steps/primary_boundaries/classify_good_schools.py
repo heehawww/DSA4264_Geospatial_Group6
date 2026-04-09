@@ -112,7 +112,7 @@ def main() -> None:
     good_out = out_dir / "good_primary_schools.csv"
     normal_out = out_dir / "normal_schools_others.csv"
     legacy_all_out = out_dir / "school_oversubscription_ranking.csv"
-    legacy_good_out = out_dir / "good_schools_top59.csv"
+    legacy_good_out = out_dir / "good_primary_schools.csv"
 
     ranking.to_csv(all_out, index=False, encoding="utf-8-sig")
     ranking.to_csv(legacy_all_out, index=False, encoding="utf-8-sig")

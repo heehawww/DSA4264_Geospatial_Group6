@@ -48,12 +48,20 @@ BENCHMARK_RESULTS_PATH = API_DATA_DIR / "benchmark_results.csv"
 BENCHMARK_RESULTS_JSON_PATH = API_DATA_DIR / "benchmark_results.json"
 BENCHMARK_METADATA_PATH = API_DATA_DIR / "benchmark_metadata.json"
 
-GOOD_SCHOOLS_PATH = BASE_DIR / "primary_boundaries" / "outputs" / "good_schools_top59.csv"
-SCHOOL_ADDRESS_DISTANCES_PATH = BASE_DIR / "hedonic_model" / "rdd_outputs" / "school_specific_address_signed_distances.csv"
+GOOD_SCHOOLS_PATH = API_DATA_DIR / "good_primary_schools.csv"
+SCHOOL_ADDRESS_DISTANCES_PATH = API_DATA_DIR / "school_specific_address_signed_distances.csv"
 
 
 def _safe_json(path: Path) -> dict[str, Any] | list[dict[str, Any]]:
     return json.loads(path.read_text())
+
+
+def _normalize_join_key(value: Any) -> str:
+    text = str(value).upper()
+    filtered = "".join(ch for ch in text if ch.isalnum())
+    if filtered.endswith("PRIMARY"):
+        filtered = filtered[: -len("PRIMARY")]
+    return filtered
 
 
 def _normalise_statsmodels_columns(df: pd.DataFrame) -> pd.DataFrame:
@@ -183,6 +191,15 @@ class DataStore:
             return pd.DataFrame(columns=["town", "school_name", "address_count", "transaction_count"])
 
         good_schools = pd.read_csv(GOOD_SCHOOLS_PATH)
+        if "join_key" not in good_schools.columns:
+            if "school_name" in good_schools.columns:
+                good_schools["join_key"] = good_schools["school_name"].map(_normalize_join_key)
+            elif "School" in good_schools.columns:
+                good_schools["school_name"] = good_schools["School"].astype(str)
+                good_schools["join_key"] = good_schools["school_name"].map(_normalize_join_key)
+            else:
+                return pd.DataFrame(columns=["town", "school_name", "address_count", "transaction_count"])
+
         distances = pd.read_csv(SCHOOL_ADDRESS_DISTANCES_PATH)
 
         feature_cols = ["address_key", "town"]
