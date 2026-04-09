@@ -105,24 +105,67 @@
 <p>For routing features, the OneMap implementation uses candidate pre-filtering by Euclidean radius and nearest-candidate cap (k). The latest optimization keeps OneMap calls for nearest mall and MRT distances while computing 10-minute count features from Euclidean thresholds. Additional deduplication groups repeated origin coordinates to reduce repeated API calls.</p>
 <p>Model-wise, resale price is modeled as log(resale_price) to stabilize variance and permit approximate percentage interpretation through exp(beta)-1. Time effects are absorbed through month and location effects through town fixed effects in OLS specifications.</p>
 <h3 id="32-data">3.2 Data</h3>
-<p>| Feature | Description | Link |</p>
-<p>|---|---|---|</p>
-<p>| MRT Station Exits | A GeoJSON that provides vector coordinates of points showing the locations of exits of all MRT stations in Singapore. This is joined with a separate dataset that contains MRT/LRT line information. | MRT locations: <a href="https://data.gov.sg/datasets?query=MRT&amp;resultId=d_b39d3a0871985372d7e1637193335da5">data.gov.sg MRT dataset</a>  MRT lines: <a href="https://www.kaggle.com/datasets/lzytim/full-list-of-mrt-and-lrt-stations-in-singapore">Kaggle MRT/LRT stations in Singapore</a> |</p>
-<p>| Bus Stops | A GeoJSON that provides vector coordinates of bus stop locations in Singapore. | <a href="https://data.gov.sg/datasets/d_3f172c6feb3f4f92a2f47d93eed2908a/view">data.gov.sg bus stop locations</a> |</p>
-<p>| Shopping Malls | A GeoJSON or coordinate dataset that provides vector coordinates of shopping mall locations. | <a href="https://www.kaggle.com/datasets/karthikgangula/shopping-mall-coordinates">Kaggle shopping mall coordinates</a> |</p>
-<p>| Supermarkets | A GeoJSON that provides vector coordinates of supermarket locations in Singapore. | <a href="https://data.gov.sg/datasets/d_cac2c32f01960a3ad7202a99c27268a0/view">data.gov.sg supermarket locations</a> |</p>
-<p>| Hawker Centres | A GeoJSON that provides vector coordinates of NEA market and food centre locations in Singapore. | <a href="https://data.gov.sg/datasets/d_a57a245b3cf3ec76ad36d55393a16e97/view">data.gov.sg hawker centre locations</a> |</p>
-<p>| Parks | A GeoJSON that provides vector coordinates of parks in Singapore. | <a href="https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view">data.gov.sg parks dataset</a> |</p>
-<p>| URA Master Plan | A GeoJSON layer that provides vectorised land parcel designation. | <a href="https://data.gov.sg/datasets?query=URA+master&amp;resultId=d_90d86daa5bfaa371668b84fa5f01424f">data.gov.sg URA Master Plan dataset</a> |</p>
-<p>| HDB Existing Buildings | A GeoJSON that provides vector objects of built HDB buildings. | <a href="https://data.gov.sg/datasets?query=HDB+building&amp;resultId=d_16b157c52ed637edd6ba1232e026258d">data.gov.sg HDB existing buildings dataset</a> |</p>
+<table>
+<thead>
+<tr>
+<th>Feature</th>
+<th>Description</th>
+<th>Link</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>MRT Station Exits</td>
+<td>A GeoJSON that provides vector coordinates of points showing the locations of exits of all MRT stations in Singapore. This is joined with a separate dataset that contains MRT/LRT line information.</td>
+<td>MRT locations: <a href="https://data.gov.sg/datasets?query=MRT&amp;resultId=d_b39d3a0871985372d7e1637193335da5">data.gov.sg MRT dataset</a>  MRT lines: <a href="https://www.kaggle.com/datasets/lzytim/full-list-of-mrt-and-lrt-stations-in-singapore">Kaggle MRT/LRT stations in Singapore</a></td>
+</tr>
+<tr>
+<td>Bus Stops</td>
+<td>A GeoJSON that provides vector coordinates of bus stop locations in Singapore.</td>
+<td><a href="https://data.gov.sg/datasets/d_3f172c6feb3f4f92a2f47d93eed2908a/view">data.gov.sg bus stop locations</a></td>
+</tr>
+<tr>
+<td>Shopping Malls</td>
+<td>A GeoJSON or coordinate dataset that provides vector coordinates of shopping mall locations.</td>
+<td><a href="https://www.kaggle.com/datasets/karthikgangula/shopping-mall-coordinates">Kaggle shopping mall coordinates</a></td>
+</tr>
+<tr>
+<td>Supermarkets</td>
+<td>A GeoJSON that provides vector coordinates of supermarket locations in Singapore.</td>
+<td><a href="https://data.gov.sg/datasets/d_cac2c32f01960a3ad7202a99c27268a0/view">data.gov.sg supermarket locations</a></td>
+</tr>
+<tr>
+<td>Hawker Centres</td>
+<td>A GeoJSON that provides vector coordinates of NEA market and food centre locations in Singapore.</td>
+<td><a href="https://data.gov.sg/datasets/d_a57a245b3cf3ec76ad36d55393a16e97/view">data.gov.sg hawker centre locations</a></td>
+</tr>
+<tr>
+<td>Parks</td>
+<td>A GeoJSON that provides vector coordinates of parks in Singapore.</td>
+<td><a href="https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view">data.gov.sg parks dataset</a></td>
+</tr>
+<tr>
+<td>URA Master Plan</td>
+<td>A GeoJSON layer that provides vectorised land parcel designation.</td>
+<td><a href="https://data.gov.sg/datasets?query=URA+master&amp;resultId=d_90d86daa5bfaa371668b84fa5f01424f">data.gov.sg URA Master Plan dataset</a></td>
+</tr>
+<tr>
+<td>HDB Existing Buildings</td>
+<td>A GeoJSON that provides vector objects of built HDB buildings.</td>
+<td><a href="https://data.gov.sg/datasets?query=HDB+building&amp;resultId=d_16b157c52ed637edd6ba1232e026258d">data.gov.sg HDB existing buildings dataset</a></td>
+</tr>
+</tbody>
+</table>
 <p>Current coverage statistics in generated artifacts:</p>
-<p>Total schools in subscription table: 179</p>
-<p>"Good schools" selected: 44</p>
-<p>Shopping centres mapped: 155</p>
-<p>MRT exits tagged: 597</p>
-<p>HDB polygons loaded: 13,386</p>
-<p>Resale address points matched to HDB polygons: 9,568</p>
-<p>Unmatched address points: 28</p>
+<ul>
+<li>Total schools in subscription table: 179</li>
+<li>"Good schools" selected: 44</li>
+<li>Shopping centres mapped: 155</li>
+<li>MRT exits tagged: 597</li>
+<li>HDB polygons loaded: 13,386</li>
+<li>Resale address points matched to HDB polygons: 9,568</li>
+<li>Unmatched address points: 28</li>
+</ul>
 <h3 id="33-experimental-design">3.3 Experimental Design</h3>
 <p>The modelling strategy in this project separates price prediction from school-premium estimation.</p>
 <p>A hedonic pricing model was first developed as the main predictive framework for HDB resale prices. Because the feature space contains many correlated engineered features and categorical controls, Ridge regression was used as the final predictive model and L2 regularisation helped stabilise coefficient estimates under multicollinearity. A reduced-feature specification with floor-area rebalancing was ultimately selected because it achieved the strongest overall holdout performance.</p>
@@ -258,7 +301,7 @@
 <h3 id="42-discussion">4.2 Discussion</h3>
 <p>From a business perspective, the results suggest that proximity to high-demand primary schools does influence HDB resale prices, but the effect is modest, uneven, and highly dependent on local context. This implies that school-related housing demand may contribute to resale price pressure in specific neighbourhoods. Thus, policy responses should be targeted and location-sensitive, rather than based on the assumption that all good schools generate the same level of housing-market distortion.</p>
 <p>The technical results also translate into two forms of business value. First, the hedonic model achieved strong predictive performance, with out-of-sample <code>R²</code> above <code>0.9</code>, allowing the system to provide credible resale price estimates for policy exploration and scenario analysis. Second, the RDD findings show that while good schools have a higher average local premium descriptively, the difference is not always statistically significant under the strictest local controlled specification. This means that school access is possibly relevant to resale prices and identifies where localised pressure may exist, but is likely also affected and eclipsed by other location factors. Thus, a point of focus going forward lies in improving visibility into where school-related demand may matter, while the main cost is that policy interpretation must remain cautious and specification-aware.</p>
-<p>4.3 Recommendations</p>
+<h3 id="43-recommendations">4.3 Recommendations</h3>
 <p>For the next phase, the project should not yet be treated as a fully operationally-ready engine for estimating school premiums. Instead, it is better as a decision-support and exploratory analysis tool. The predictive hedonic model is strong enough to support internal price estimation and scenario exploration, while the school-specific RDD results are useful for highlighting where local school-related housing pressure may be present, but only to be used with caution rather than as a direct basis for policy intervention.</p>
 <p>From a data and modelling perspective, several improvements could strengthen future versions. First, adopt a more tiered reporting standard for policy users by presenting pooled estimates alongside town-specific ranges and uncertainty intervals, so that results are not over-generalised into one universal premium. Additionally, the RDD analysis would benefit from stronger local comparability checks and if possible, more precise geolocation than address-point matching. Future work could potentially also prioritise richer upstream datasets, especially variables that are currently missing but likely important for price formation, such as housing conditions or more time-sensitive school demand information.</p>
 <p>Overall, we recommended retaining the current system as a useful internal analytical tool, while treating further deployment, richer data collection, and stronger identification or causal checks as the priority for the next project phase.</p>
@@ -272,9 +315,15 @@
 <h3 id="52-model-serving">5.2 Model Serving</h3>
 <p>Models are trained offline and served from serialized artifacts (ridge_pipeline.pkl, metrics.json, ols_coefficients.csv, and RDD/town-premium tables under data/ on the api branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.</p>
 <h3 id="53-llm-interface">5.3 LLM Interface</h3>
-<p>{</p>
-<p>"mermaid": "flowchart LR\n    U[\"User Question\"] --&gt; F[\"Frontend Chat Input\"]\n    F &lt;--&gt; L[\"LLM Parser\"]\n    L --&gt; T[\"Agent Tools\"]\n    T --&gt; B[\"Backend API\"]\n    B &lt;--&gt; D[\"Model/data look up\"]\n    B --&gt; L\n    F --&gt; R[\"User Response\"]"</p>
-<p>}</p>
+<pre><code class="language-mermaid">flowchart LR
+    U[&quot;User Question&quot;] --&gt; F[&quot;Frontend Chat Input&quot;]
+    F &lt;--&gt; L[&quot;LLM Parser&quot;]
+    L --&gt; T[&quot;Agent Tools&quot;]
+    T --&gt; B[&quot;Backend API&quot;]
+    B &lt;--&gt; D[&quot;Model/data look up&quot;]
+    B --&gt; L
+    F --&gt; R[&quot;User Response&quot;]
+</code></pre>
 <p>Natural-language queries are mapped to endpoint intents and routed to backend/model outputs. Flow: User -&gt; LLM/parser -&gt; backend -&gt; model/artifact -&gt; response.</p>
               
             </div>
