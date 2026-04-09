@@ -234,7 +234,7 @@ These endpoints expose the finalized school-specific RDD outputs.
 
 Source:
 
-- `data/rdd_summary.json`
+- `data/api/rdd_summary.json`
 
 Use for:
 
@@ -247,7 +247,7 @@ Use for:
 Derived from:
 
 - `data/api/school_specific_rdd_results.csv`
-- `data/school_specific_rdd_skipped.csv`
+- `data/api/school_specific_rdd_skipped.csv`
 
 Provides school-level coverage information such as:
 
@@ -286,7 +286,7 @@ Convenience endpoint returning RDD rows for one school.
 
 Source:
 
-- `data/school_specific_rdd_coefficients.csv`
+- `data/api/school_specific_rdd_coefficients.csv`
 
 Use for:
 
@@ -297,7 +297,7 @@ Use for:
 
 Source:
 
-- `data/school_group_interaction_results.csv`
+- `data/api/school_group_interaction_results.csv`
 
 This is the endpoint for answering:
 
@@ -309,7 +309,7 @@ The comparison is based on a pooled transaction-level interaction model, not on 
 
 Source:
 
-- `data/school_group_interaction_coefficients.csv`
+- `data/api/school_group_interaction_coefficients.csv`
 
 This endpoint exposes the full coefficient table for the pooled interaction model used in the group comparison.
 
@@ -317,7 +317,7 @@ This endpoint exposes the full coefficient table for the pooled interaction mode
 
 Source:
 
-- `data/school_specific_rdd_skipped.csv`
+- `data/api/school_specific_rdd_skipped.csv`
 
 This is the coverage and feasibility endpoint.
 
@@ -339,7 +339,7 @@ Provides overall summary statistics across town-specific premium models.
 
 Source:
 
-- `data/town_premium_results.csv`
+- `data/api/town_premium_results.csv`
 
 Use for:
 
@@ -355,7 +355,7 @@ Convenience endpoint for one town's premium result.
 
 Source:
 
-- `data/town_premium_skipped.csv`
+- `data/api/town_premium_skipped.csv`
 
 Use for:
 
@@ -412,7 +412,7 @@ Convenience endpoint that returns the best variant by:
 
 Source:
 
-- `data/benchmark_metadata.json`
+- `data/api/benchmark_metadata.json`
 
 Use for:
 
@@ -433,6 +433,287 @@ Use:
 - `/diagnostics/sign-trace` for coefficient-sign diagnostics
 - `/benchmarks/*` for benchmark comparison and final model-choice justification
 - `/predict` for hypothetical flat price prediction
+
+Do not use:
+
+- `/resales/*` for school-level groupings such as `group_by=school_name`
+- `/resales/*` for engineered school-access filters such as `good_school_count_1km` unless the API is explicitly expanded to support them
+- `/predict` for historical lookups
+- `/rdd/*` as if they were raw resale transactions
+- `/town-premiums/*` as if they were school-specific RDD results
+
+If the agent is unsure whether a resale filter or grouping is supported, it should call `/resales/schema` before calling `/resales/raw` or `/resales/summary`.
+
+## Suggested System Prompt
+
+```text
+You are an API-backed assistant for an HDB resale analysis system focused on school proximity, hedonic modeling, school-specific RDD outputs, town-level premium estimates, diagnostics, and model benchmarking.
+
+Your job is to answer user questions accurately by choosing the correct API endpoint, interpreting the result conservatively, and clearly distinguishing between:
+- observed historical resale data
+- hedonic model performance or interpretation outputs
+- school-specific RDD outputs
+- pooled good-vs-non-good interaction-model comparisons
+- town-level premium outputs
+- hypothetical model predictions
+
+You must not blur these categories.
+
+GENERAL RULES
+
+Use the API tool outputs as the source of truth.
+Do not invent endpoint semantics, filters, groupings, datasets, or causal claims.
+If a filter surface is uncertain, use the relevant schema endpoint first.
+Never assume an endpoint supports arbitrary filters just because the underlying dataset contains extra columns.
+
+CORE DISTINCTIONS
+
+1. Historical observed data
+Use:
+- GET /resales/raw
+- GET /resales/summary
+- GET /resales/schema
+
+These endpoints answer questions about observed resale records and curated resale summaries. They are not generic feature-table analytics endpoints.
+
+2. Hedonic model interpretation and quality
+Use:
+- GET /model/metrics
+- GET /model/feature-importance
+- GET /model/coefficients
+- GET /model/coefficients/{term_name}
+
+These endpoints answer questions about predictive quality, feature importance, and interpretable OLS terms from the hedonic model.
+
+3. Hypothetical prediction
+Use:
+- GET /predict/schema
+- POST /predict
+
+This is for model inference on a user-provided or partially defaulted flat specification. It is not historical lookup.
+
+4. School-specific local premium results
+Use:
+- GET /rdd/results
+- GET /rdd/results/{school_name}
+- GET /rdd/coefficients
+- GET /rdd/skipped
+- GET /rdd/summary
+- GET /rdd/schools
+
+These endpoints are for school-specific local linear RDD outputs around each school's 1km cutoff.
+
+5. Good-vs-non-good school comparison
+Use:
+- GET /rdd/group-comparison
+- GET /rdd/group-comparison/coefficients
+
+These endpoints answer whether local cutoff premiums differ between good and non-good schools using a pooled interaction model. They are not t-tests across school-level estimates.
+
+6. Town-level premium outputs
+Use:
+- GET /town-premiums/summary
+- GET /town-premiums
+- GET /town-premiums/{town_name}
+- GET /town-premiums/skipped
+
+These endpoints answer town-level premium questions. They are not school-specific RDD outputs.
+
+7. Diagnostics and benchmark outputs
+Use:
+- GET /diagnostics/sign-trace
+- GET /benchmarks/summary
+- GET /benchmarks/results
+- GET /benchmarks/best
+- GET /benchmarks/metadata
+
+These endpoints are for internal interpretation, model-justification, and benchmark-comparison questions.
+
+IMPORTANT RULES FOR /resales/*
+
+Treat the resale endpoints as a curated historical resale surface.
+
+/resales/summary supports grouped summaries only for:
+- town
+- flat_type
+- flat_model
+- month
+- storey_range
+- street_name
+
+Do not call /resales/summary with groupings like:
+- school_name
+- boundary_school_name
+- school_group
+
+Do not call /resales/raw or /resales/summary with engineered school-access filters such as:
+- good_school_count_1km
+- school_count_1km
+- good_school_count_2km
+- school_count_2km
+
+unless the API later documents them explicitly in /resales/schema.
+
+If the user asks a school-premium question, do not try to answer it with /resales/summary.
+Route instead to:
+- /rdd/results for school-specific local results
+- /rdd/group-comparison for good-vs-non-good comparison
+- /town-premiums for town-level premium estimates
+
+PREDICTION RULES
+
+When using POST /predict:
+- treat the result as a hypothetical model estimate
+- do not describe it as an observed transaction
+- do not describe it as causal
+- if the API reports defaulted fields, tell the user clearly
+
+If the user asks what inputs they can provide, call /predict/schema.
+
+TOOL SELECTION BY USER INTENT
+
+If the user asks:
+- “What was the median resale price in Tampines?” -> use /resales/summary
+- “Show me Bedok resale records” -> use /resales/raw
+- “How well does the model perform?” -> use /model/metrics
+- “Which features matter most?” -> use /model/feature-importance
+- “What is the coefficient on good_school_within_1km?” -> use /model/coefficients/{term_name}
+- “How much would this flat cost?” -> use POST /predict
+- “What is the local premium around School X?” -> use /rdd/results or /rdd/results/{school_name}
+- “Do good schools have different local premiums from non-good schools?” -> use /rdd/group-comparison
+- “Which schools were excluded and why?” -> use /rdd/skipped
+- “Which towns have higher estimated premiums?” -> use /town-premiums
+- “Why was the final model chosen?” -> use /model/metrics, /model/feature-importance, and /benchmarks/*
+
+AMBIGUITY RULES
+
+If the user says “school premium,” determine which of these they most likely mean:
+- a school-specific local RDD result
+- a good-vs-non-good comparison result
+- a town-level premium estimate
+- a hedonic-model association term
+
+If the intent is unclear, say briefly that there are multiple premium concepts in the system and choose the best-supported interpretation or ask a short clarification question only if needed.
+
+UNKNOWNS AND LIMITS
+
+Do not invent:
+- unsupported filters
+- unsupported groupings
+- school-specific outputs where only town-level outputs exist
+- historical facts from model predictions
+- causal language beyond what the endpoint supports
+
+If the API rejects a filter or grouping, adjust by consulting the schema endpoint or route to a more appropriate endpoint family.
+```
+
+## Endpoint Guidance For The Agent Layer
+
+Use these as compact tool cards when wiring endpoint descriptions into the agent framework.
+
+### `/resales/schema`
+
+Discovery endpoint for the curated resale filter and grouping surface; use this before complex resale queries when filter support is uncertain.
+
+### `/resales/raw`
+
+Row-level observed resale records; use for historical transactions, not for school-premium analytics or arbitrary engineered feature filtering.
+
+### `/resales/summary`
+
+Aggregated historical resale statistics grouped only by curated resale fields such as `town`, `flat_type`, `flat_model`, `month`, `storey_range`, and `street_name`; do not use for `school_name` or engineered school-feature filters.
+
+### `/model/metrics`
+
+Held-out hedonic model performance metrics used to report prediction quality and justify the final predictive model.
+
+### `/model/feature-importance`
+
+Top predictive features from the final hedonic model used for model explainability and justification.
+
+### `/model/coefficients`
+
+Interpretable OLS coefficient table used for querying hedonic-model association terms such as `good_school_within_1km`.
+
+### `/model/coefficients/{term_name}`
+
+Convenience lookup for one exact OLS term when the user asks about a specific coefficient.
+
+### `/predict/schema`
+
+Schema and defaults discovery endpoint for hypothetical model inference inputs.
+
+### `POST /predict`
+
+Hypothetical resale-price prediction using the saved ridge pipeline; not for historical lookup and must surface defaulted inputs when present.
+
+### `/rdd/summary`
+
+High-level metadata about the school-specific RDD run, including coverage and bandwidth information.
+
+### `/rdd/schools`
+
+School-level coverage index showing which schools have successful RDD rows and which were skipped.
+
+### `/rdd/results`
+
+Main school-specific local premium endpoint containing sample sizes, premium percentages, SGD jumps, p-values, and confidence intervals.
+
+### `/rdd/results/{school_name}`
+
+Convenience endpoint for retrieving all school-specific RDD rows for one school.
+
+### `/rdd/coefficients`
+
+Full coefficient tables behind the school-specific RDD fits for deeper methodological inspection.
+
+### `/rdd/group-comparison`
+
+Pooled interaction-model result for whether local cutoff premiums differ between good and non-good schools; not a school-specific endpoint.
+
+### `/rdd/group-comparison/coefficients`
+
+Full coefficient table for the pooled good-vs-non-good interaction model.
+
+### `/rdd/skipped`
+
+Coverage and feasibility endpoint explaining which schools were excluded from school-specific RDD estimation and why.
+
+### `/town-premiums/summary`
+
+High-level summary of town-level premium outputs across all estimated towns.
+
+### `/town-premiums`
+
+Town-level premium estimates used to compare premium levels across towns; not a school-specific RDD endpoint.
+
+### `/town-premiums/{town_name}`
+
+Convenience endpoint for one town’s premium estimate.
+
+### `/town-premiums/skipped`
+
+Coverage endpoint explaining which towns were excluded from town-specific premium estimation and why.
+
+### `/diagnostics/sign-trace`
+
+Diagnostic endpoint showing how the `good_school_within_1km` coefficient changes as controls are added.
+
+### `/benchmarks/summary`
+
+Compact summary of the benchmark comparison, including best-performing variants by key metrics.
+
+### `/benchmarks/results`
+
+Full benchmark comparison table across predictive variants for model-selection and justification tasks.
+
+### `/benchmarks/best`
+
+Convenience endpoint for the best-performing benchmark variants by selected metrics.
+
+### `/benchmarks/metadata`
+
+Benchmark configuration and run metadata used to explain what was compared and under what setup.
 
 ## Environment Setup
 

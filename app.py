@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-import importlib
 import json
 import os
 from pathlib import Path
 from typing import Any
 
 import geopandas as gpd
+import joblib
 import numpy as np
 import pandas as pd
 import pydeck as pdk
@@ -16,6 +16,7 @@ from dotenv import load_dotenv
 
 import chatbot.agent as chatbot_agent
 from hedonic_model.train_hedonic_model import (
+    FEATURE_SPECS,
     engineer_features,
     fit_predictive_model,
     time_split,
@@ -24,18 +25,27 @@ from hedonic_model.train_hedonic_model import (
 
 REPO_ROOT = Path(__file__).resolve().parent
 load_dotenv(REPO_ROOT / ".env")
-chatbot_agent = importlib.reload(chatbot_agent)
 
-PREDICTIONS_PATH = REPO_ROOT / "hedonic_model/outputs/predictions.csv"
-FEATURES_PATH = (
-    REPO_ROOT
-    / "data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv"
-)
+FEATURES_PATH_CANDIDATES = [
+    REPO_ROOT / "data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv",
+    REPO_ROOT / "data/api/resale_flats_with_school_buffer_counts_with_walkability.csv",
+]
+RIDGE_PIPELINE_PATH_CANDIDATES = [
+    REPO_ROOT / "data/api/ridge_pipeline.pkl",
+    REPO_ROOT / "hedonic_model/rebalanced_outputs/ridge_pipeline.pkl",
+    REPO_ROOT / "hedonic_model/outputs/ridge_pipeline.pkl",
+]
+METRICS_PATH_CANDIDATES = [
+    REPO_ROOT / "data/api/metrics.json",
+    REPO_ROOT / "hedonic_model/rebalanced_outputs/metrics.json",
+    REPO_ROOT / "hedonic_model/outputs/metrics.json",
+]
 POINTS_PATH = REPO_ROOT / "data/feature_engineering/outputs/resale_address_points_matched_with_school_counts.geojson"
 BUFFER_1KM_PATH = REPO_ROOT / "data/feature_engineering/outputs/primary_school_boundaries_buffer_1km.geojson"
 BUFFER_2KM_PATH = REPO_ROOT / "data/feature_engineering/outputs/primary_school_boundaries_buffer_2km.geojson"
 BUILDINGS_PATH = REPO_ROOT / "data/feature_engineering/outputs/hdb_existing_buildings_layer.geojson"
 DEFAULT_API_BASE_URL = os.getenv("HDB_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
+
 
 
 st.set_page_config(
@@ -99,6 +109,21 @@ def _escape_tooltip_value(value: object) -> str:
         .replace('"', "&quot;")
         .replace("'", "&#x27;")
     )
+
+
+def _resolve_first_existing_path(candidates: list[Path], label: str) -> Path:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    candidate_text = "\n".join(f"- {path}" for path in candidates)
+    raise FileNotFoundError(f"Could not find {label}. Checked:\n{candidate_text}")
+
+
+def _find_first_existing_path(candidates: list[Path]) -> Path | None:
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
 
 
 class ApiClientError(RuntimeError):
@@ -171,15 +196,40 @@ def render_api_status() -> None:
 
 
 @st.cache_data(show_spinner=False)
+def load_model_metrics() -> dict[str, Any]:
+    metrics_path = _find_first_existing_path(METRICS_PATH_CANDIDATES)
+    if metrics_path is None:
+        return {}
+    try:
+        return json.loads(metrics_path.read_text())
+    except json.JSONDecodeError:
+        return {}
+
+
+def _feature_spec_from_metrics() -> str:
+    metrics = load_model_metrics()
+    feature_spec = str(metrics.get("feature_spec", "baseline"))
+    return feature_spec if feature_spec in FEATURE_SPECS else "baseline"
+
+
+def _get_pipeline_feature_columns(predictive_model: Any) -> list[str]:
+    preprocessor = predictive_model.named_steps["preprocessor"]
+    numeric_columns = list(preprocessor.transformers_[0][2])
+    categorical_columns = list(preprocessor.transformers_[1][2])
+    return numeric_columns + categorical_columns
+
+
+@st.cache_data(show_spinner=False)
 def load_prediction_dataset() -> pd.DataFrame:
-    if PREDICTIONS_PATH.exists():
-        predictions = pd.read_csv(PREDICTIONS_PATH)
-    else:
-        raw = pd.read_csv(FEATURES_PATH)
-        model_df = engineer_features(raw)
-        train_df, test_df = time_split(model_df, test_months=12)
-        predictive_model, _, _ = fit_predictive_model(train_df, test_df)
-        predictions = build_prediction_frame_for_app(raw, model_df, predictive_model, test_df)
+    raw = pd.read_csv(_resolve_first_existing_path(FEATURES_PATH_CANDIDATES, "feature dataset"))
+    fallback_numeric_features = FEATURE_SPECS[_feature_spec_from_metrics()]
+    model_df = engineer_features(raw, numeric_features=fallback_numeric_features)
+    predictive_model = load_or_fit_predictive_model(model_df)
+    model_feature_columns = _get_pipeline_feature_columns(predictive_model)
+    numeric_columns = [column for column in model_feature_columns if column in FEATURE_SPECS["baseline"]]
+    model_df = engineer_features(raw, numeric_features=numeric_columns)
+    _, test_df = time_split(model_df, test_months=12)
+    predictions = build_prediction_frame_for_app(raw, model_df, predictive_model, test_df, model_feature_columns)
 
     predictions["month"] = predictions["month"].astype(str)
     predictions["dataset_split"] = predictions["dataset_split"].astype(str)
@@ -196,19 +246,34 @@ def load_prediction_dataset() -> pd.DataFrame:
     return predictions
 
 
+@st.cache_resource(show_spinner=False)
+def load_or_fit_predictive_model(model_df: pd.DataFrame):
+    pipeline_path = None
+    for candidate in RIDGE_PIPELINE_PATH_CANDIDATES:
+        if candidate.exists():
+            pipeline_path = candidate
+            break
+
+    if pipeline_path is not None:
+        return joblib.load(pipeline_path)
+
+    numeric_features = FEATURE_SPECS[_feature_spec_from_metrics()]
+    if model_df.empty:
+        raise ValueError("Model feature dataset is empty.")
+    train_df, test_df = time_split(model_df, test_months=12)
+    predictive_model, _, _ = fit_predictive_model(train_df, test_df, numeric_features=numeric_features)
+    return predictive_model
+
+
 def build_prediction_frame_for_app(
     raw_df: pd.DataFrame,
     model_df: pd.DataFrame,
     predictive_model: Any,
     test_df: pd.DataFrame,
+    model_feature_columns: list[str],
 ) -> pd.DataFrame:
-    """Build frontend prediction rows if the training export has not been generated yet."""
-    feature_columns = [
-        column
-        for column in model_df.columns
-        if column not in {"log_resale_price", "resale_price", "month_dt", "month_period"}
-    ]
-    X_all = model_df[feature_columns]
+    """Build frontend prediction rows from the saved ridge pipeline and feature table."""
+    X_all = model_df[model_feature_columns]
     predicted_prices = np.exp(predictive_model.predict(X_all))
 
     keep_columns = [
@@ -287,12 +352,47 @@ def load_hdb_buildings() -> dict[str, Any]:
 
 
 @st.cache_data(show_spinner=False)
+def load_good_school_lookup() -> pd.DataFrame:
+    points = gpd.read_file(POINTS_PATH)[["address_key", "geometry"]].copy()
+    buffers = gpd.read_file(BUFFER_1KM_PATH)[["school_name", "is_good_school", "geometry"]].copy()
+    good_mask = buffers["is_good_school"].astype(str).str.strip().str.lower().isin({"true", "1", "yes"})
+    buffers = buffers.loc[good_mask].copy()
+    joined = gpd.sjoin(
+        points,
+        buffers,
+        how="left",
+        predicate="within",
+    )
+    lookup = (
+        joined.groupby("address_key")["school_name"]
+        .apply(lambda series: ", ".join(sorted({str(value) for value in series.dropna() if str(value).strip()})))
+        .reset_index(name="good_school_names_1km")
+    )
+    return lookup
+
+
+@st.cache_data(show_spinner=False)
 def build_map_dataset() -> pd.DataFrame:
     predictions = load_prediction_dataset()
     points = load_points()
     merged = predictions.merge(points, on="address_key", how="left")
+    merged = merged.merge(load_good_school_lookup(), on="address_key", how="left")
     merged = merged.dropna(subset=["latitude", "longitude", "predicted_resale_price"])
+    actual_prices = pd.to_numeric(merged["resale_price"], errors="coerce")
+    predicted_prices = pd.to_numeric(merged["predicted_resale_price"], errors="coerce")
+    merged["display_price"] = actual_prices.fillna(predicted_prices)
+    merged["display_price_type"] = np.where(actual_prices.notna(), "Price", "Predicted price")
     merged["price_gap_pct"] = merged["prediction_error"] / merged["predicted_resale_price"]
+    metrics = load_model_metrics()
+    premium_pct = pd.to_numeric(metrics.get("good_school_within_1km_premium_pct_from_ols"), errors="coerce")
+    if pd.isna(premium_pct):
+        merged["premium_price"] = np.nan
+    else:
+        merged["premium_price"] = np.where(
+            merged["good_school_within_1km"] == 1,
+            merged["predicted_resale_price"] * float(premium_pct),
+            np.nan,
+        )
     return merged
 
 
@@ -303,15 +403,6 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
     selected_month = st.sidebar.selectbox("Month", months, index=len(months) - 1)
     split = st.sidebar.selectbox("Dataset split", ["all", "train", "test"])
     school_filter = st.sidebar.selectbox("Good school within 1km", ["all", "yes", "no"])
-    metric = st.sidebar.selectbox(
-        "Map color metric",
-        [
-            "predicted_resale_price",
-            "prediction_error",
-            "resale_price",
-            "good_school_count_1km",
-        ],
-    )
     show_school_1km = st.sidebar.toggle("Show school 1km boundaries", value=True)
     show_school_2km = st.sidebar.toggle("Show school 2km boundaries", value=True)
     show_buildings = st.sidebar.toggle("Show HDB building outlines", value=True)
@@ -328,7 +419,7 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
         "month": selected_month,
         "split": split,
         "school_filter": school_filter,
-        "metric": metric,
+        "metric": "display_price",
         "show_school_1km": show_school_1km,
         "show_school_2km": show_school_2km,
         "show_buildings": show_buildings,
@@ -339,25 +430,17 @@ def filter_dataset(dataset: pd.DataFrame) -> pd.DataFrame:
 def add_color_columns(frame: pd.DataFrame, metric: str) -> pd.DataFrame:
     colored = frame.copy()
     metric_values = pd.to_numeric(colored[metric], errors="coerce").fillna(0)
-    if metric == "prediction_error":
-        max_abs = max(metric_values.abs().quantile(0.95), 1)
-        clipped = metric_values.clip(-max_abs, max_abs) / max_abs
-        colored["fill_color"] = clipped.apply(
-            lambda value: [35, 109, 177, 180] if value >= 0 else [214, 69, 65, 180]
-        )
-        colored["radius"] = 75 + metric_values.abs().clip(0, max_abs).fillna(0) / max_abs * 125
-    else:
-        high = max(metric_values.quantile(0.95), 1)
-        scaled = metric_values.clip(0, high) / high
-        colored["fill_color"] = scaled.apply(
-            lambda value: [
-                int(34 + value * 180),
-                int(82 + value * 90),
-                int(46 + value * 40),
-                180,
-            ]
-        )
-        colored["radius"] = 70 + scaled * 140
+    high = max(metric_values.quantile(0.95), 1)
+    scaled = metric_values.clip(0, high) / high
+    colored["fill_color"] = scaled.apply(
+        lambda value: [
+            int(34 + value * 180),
+            int(82 + value * 90),
+            int(46 + value * 40),
+            180,
+        ]
+    )
+    colored["radius"] = 90
     return colored
 
 
@@ -373,26 +456,20 @@ def render_map(
         return
 
     points = add_color_columns(filtered, metric)
-    actual_prices = pd.to_numeric(points["resale_price"], errors="coerce")
-    predicted_prices = pd.to_numeric(points["predicted_resale_price"], errors="coerce")
-    points["display_price"] = actual_prices.fillna(predicted_prices)
-    points["display_price_type"] = actual_prices.notna().map(
-        {True: "Actual resale price", False: "Predicted price"}
-    )
     points["display_price_label"] = points["display_price"].map(_format_currency)
-    points["actual_price_label"] = points["resale_price"].map(_format_currency)
-    points["predicted_price_label"] = points["predicted_resale_price"].map(_format_currency)
-    points["prediction_error_label"] = points["prediction_error"].map(_format_currency)
-    points["school_count_1km_label"] = points["good_school_count_1km"].fillna(0).astype(int).astype(str)
+    points["premium_price_label"] = points["premium_price"].map(_format_currency)
+    points["good_school_names_1km"] = (
+        points["good_school_names_1km"]
+        .fillna("")
+        .replace("", "None")
+    )
     points["tooltip_html"] = points.apply(
         lambda row: (
             f"<b>{_escape_tooltip_value(row['block'])} {_escape_tooltip_value(row['street_name'])}</b><br/>"
             f"{_escape_tooltip_value(row['display_price_type'])}: "
             f"{_escape_tooltip_value(row['display_price_label'])}<br/>"
-            f"Predicted: {_escape_tooltip_value(row['predicted_price_label'])}<br/>"
-            f"Actual: {_escape_tooltip_value(row['actual_price_label'])}<br/>"
-            f"Error: {_escape_tooltip_value(row['prediction_error_label'])}<br/>"
-            f"Good schools within 1km: {_escape_tooltip_value(row['school_count_1km_label'])}"
+            f"Premium price: {_escape_tooltip_value(row['premium_price_label'])}<br/>"
+            f"Good school(s) within 1km: {_escape_tooltip_value(row['good_school_names_1km'])}"
         ),
         axis=1,
     )
@@ -578,6 +655,32 @@ def fallback_chat_response(
     )
 
 
+def build_agent_failure_response(user_prompt: str, api_context: dict[str, Any] | None = None) -> str:
+    prompt = user_prompt.lower()
+    if api_context and api_context.get("api_error"):
+        return (
+            "Sorry, I could not reach the API service just now, so I am not able to answer that reliably at the moment. "
+            "Please try again after the backend is running."
+        )
+
+    if any(keyword in prompt for keyword in ["school", "premium", "rdd", "good school", "mee toh", "raffles girls"]):
+        return (
+            "Sorry, I do not have a supported chatbot route for that school-level premium comparison yet. "
+            "The underlying API has school-specific RDD data, but this chat workflow is not fully wired to answer that request directly yet."
+        )
+
+    if any(keyword in prompt for keyword in ["predict", "prediction", "what if", "estimate"]):
+        return (
+            "Sorry, I could not complete that prediction request just now. "
+            "Please try again with a simpler set of flat details or after the backend is available."
+        )
+
+    return (
+        "Sorry, I could not answer that request through the current chat workflow. "
+        "The data or route for that question may not be available in the chatbot yet."
+    )
+
+
 def call_agent_with_context(
     map_context: str,
     api_context: dict[str, Any],
@@ -641,10 +744,8 @@ def render_chatbot(filtered: pd.DataFrame) -> None:
                 api_context,
                 st.session_state["chat_messages"],
             )
-        except Exception as exc:
-            reply = fallback_chat_response(filtered, user_prompt, api_context)
-            if "api_error" not in api_context:
-                reply = f"{reply}\n\nAgent call failed: {exc}"
+        except Exception:
+            reply = build_agent_failure_response(user_prompt, api_context)
     st.session_state["chat_messages"].append({"role": "assistant", "content": reply})
     st.rerun()
 
