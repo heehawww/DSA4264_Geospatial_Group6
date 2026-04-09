@@ -2,6 +2,8 @@
 
 This project studies how proximity to "good" primary schools is associated with HDB resale prices.
 
+The technical report can be found [here](https://heehawww.github.io/DSA4264_Geospatial_Group6/technical_report/).
+
 ## Setup
 
 If you are running locally, you can initialize a Python virtual environment and install the dependencies:
