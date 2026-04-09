@@ -1,0 +1,15 @@
+{
+  "transactions_with_geocoded_addresses": 9568,
+  "transaction_rows_used": 223550,
+  "school_buffers_total": 178,
+  "school_buffers_good": 38,
+  "school_buffers_non_good": 140,
+  "bandwidths_m": [
+    100,
+    200,
+    300,
+    500
+  ],
+  "school_specific_rows_used": 1109543,
+  "school_specific_schools_with_results": 170
+}
