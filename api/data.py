@@ -48,6 +48,9 @@ BENCHMARK_RESULTS_PATH = API_DATA_DIR / "benchmark_results.csv"
 BENCHMARK_RESULTS_JSON_PATH = API_DATA_DIR / "benchmark_results.json"
 BENCHMARK_METADATA_PATH = API_DATA_DIR / "benchmark_metadata.json"
 
+GOOD_SCHOOLS_PATH = BASE_DIR / "primary_boundaries" / "outputs" / "good_schools_top59.csv"
+SCHOOL_ADDRESS_DISTANCES_PATH = BASE_DIR / "hedonic_model" / "rdd_outputs" / "school_specific_address_signed_distances.csv"
+
 
 def _safe_json(path: Path) -> dict[str, Any] | list[dict[str, Any]]:
     return json.loads(path.read_text())
@@ -93,6 +96,7 @@ class DataStore:
     benchmark_results: pd.DataFrame
     benchmark_results_json: list[dict[str, Any]]
     benchmark_metadata: dict[str, Any]
+    town_good_schools: pd.DataFrame
     defaults: dict[str, Any]
     allowed_categories: dict[str, list[str]]
     feature_dataset_path: Path
@@ -136,6 +140,7 @@ class DataStore:
         benchmark_results = pd.read_csv(BENCHMARK_RESULTS_PATH)
         benchmark_results_json = _safe_json(BENCHMARK_RESULTS_JSON_PATH)
         benchmark_metadata = _safe_json(BENCHMARK_METADATA_PATH)
+        town_good_schools = cls._build_town_good_schools(feature_dataset)
 
         defaults = cls._build_defaults(feature_dataset, modeled_feature_dataset)
         allowed_categories = {
@@ -165,11 +170,61 @@ class DataStore:
             benchmark_results=benchmark_results,
             benchmark_results_json=benchmark_results_json,
             benchmark_metadata=benchmark_metadata,
+            town_good_schools=town_good_schools,
             defaults=defaults,
             allowed_categories=allowed_categories,
             feature_dataset_path=FEATURE_DATASET_PATH,
             month_start=month_start,
         )
+
+    @staticmethod
+    def _build_town_good_schools(feature_dataset: pd.DataFrame) -> pd.DataFrame:
+        if not GOOD_SCHOOLS_PATH.exists() or not SCHOOL_ADDRESS_DISTANCES_PATH.exists():
+            return pd.DataFrame(columns=["town", "school_name", "address_count", "transaction_count"])
+
+        good_schools = pd.read_csv(GOOD_SCHOOLS_PATH)
+        distances = pd.read_csv(SCHOOL_ADDRESS_DISTANCES_PATH)
+
+        feature_cols = ["address_key", "town"]
+        address_town = (
+            feature_dataset[feature_cols]
+            .dropna(subset=["address_key", "town"])
+            .drop_duplicates()
+        )
+        txn_counts = (
+            feature_dataset[feature_cols]
+            .dropna(subset=["address_key", "town"])
+            .groupby(["address_key", "town"], dropna=False)
+            .size()
+            .reset_index(name="transaction_count")
+        )
+
+        good_join_keys = set(good_schools["join_key"].dropna().astype(str).str.upper())
+        linked = distances.copy()
+        linked["boundary_school_join_key"] = linked["boundary_school_join_key"].astype(str).str.upper()
+        linked = linked.loc[
+            linked["boundary_school_join_key"].isin(good_join_keys)
+            & (pd.to_numeric(linked["inside_good_school_1km"], errors="coerce") == 1)
+        ]
+
+        if linked.empty:
+            return pd.DataFrame(columns=["town", "school_name", "address_count", "transaction_count"])
+
+        linked = linked.merge(address_town, on="address_key", how="inner")
+        linked = linked.merge(txn_counts, on=["address_key", "town"], how="left")
+        linked["transaction_count"] = pd.to_numeric(linked["transaction_count"], errors="coerce").fillna(0).astype(int)
+
+        grouped = (
+            linked.groupby(["town", "boundary_school_name"], dropna=False)
+            .agg(
+                address_count=("address_key", "nunique"),
+                transaction_count=("transaction_count", "sum"),
+            )
+            .reset_index()
+            .rename(columns={"boundary_school_name": "school_name"})
+            .sort_values(["town", "transaction_count", "address_count", "school_name"], ascending=[True, False, False, True])
+        )
+        return grouped
 
     @staticmethod
     def _build_defaults(raw_df: pd.DataFrame, modeled_df: pd.DataFrame) -> dict[str, Any]:
@@ -252,10 +307,19 @@ class DataStore:
             "town_premium_skipped_rows": int(len(self.town_premium_skipped)),
             "sign_trace_rows": int(len(self.sign_trace)),
             "benchmark_rows": int(len(self.benchmark_results)),
+            "town_good_school_rows": int(len(self.town_good_schools)),
             "model_metrics": self.metrics,
             "rdd_summary": self.rdd_summary,
             "benchmark_metadata": self.benchmark_metadata,
         }
+
+    def get_good_schools(self, town: str | None = None, limit: int = 50) -> list[dict[str, Any]]:
+        df = self.town_good_schools.copy()
+        if town:
+            df = df.loc[df["town"].astype(str).str.upper() == town.upper()]
+        if df.empty:
+            return []
+        return df.head(limit).to_dict(orient="records")
 
     def build_prediction_features(self, payload: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
         merged = dict(self.defaults)

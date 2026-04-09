@@ -97,6 +97,13 @@ class ResalesSchemaResponse(BaseModel):
     notes: list[str]
 
 
+class GoodSchoolsResponse(BaseModel):
+    town: str | None
+    count: int
+    rows: list[dict[str, Any]]
+    notes: list[str]
+
+
 class PredictSchemaResponse(BaseModel):
     raw_request_fields: dict[str, Any]
     engineered_model_fields: list[str]
