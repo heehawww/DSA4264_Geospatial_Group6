@@ -73,194 +73,74 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
             <div class="section" itemprop="articleBody">
               
-                <h1 id="technical-report-estimating-the-hdb-resale-price-effect-of-proximity-to-oversubscribed-primary-schools">Technical Report: Estimating the HDB Resale Price Effect of Proximity to Oversubscribed Primary Schools</h1>
-<h1 id="1-context">1. Context</h1>
-<p>The Ministry of National Development (MND) plans Singapore's land use and public housing. HDB resale prices have risen due to supply-demand conditions and location preferences, including proximity to primary schools.</p>
-<p>Under the Ministry of Education (MOE) admission framework, priority is given to students living within distance bands, especially within 1km. As a result, flats near "good" primary schools are often perceived to command higher prices.</p>
+                <h2 id="1-context">1. Context</h2>
+<p>The Ministry of National Development (MND) is responsible for planning Singapore's land use and ensuring the provision of affordable and accessible public housing. In recent years, HDB resale prices have experienced upward pressure, driven by a combination of supply-demand dynamics and location-based preferences. One key factor influencing buyer behaviour is proximity to desirable primary schools.</p>
+<p>Under the admission framework administered by the Ministry of Education (MOE), priority is given to students living within specified distance bands, especially within 1km of a school. As a result, flats located near "good" primary schools are often perceived to command higher resale prices as households seek to secure admission advantages.</p>
 <p>This motivates the core policy question: does proximity to "good" primary schools produce a measurable resale premium after controlling for other housing and location factors?</p>
-<h1 id="2-scope">2. Scope</h1>
+<h2 id="2-scope">2. Scope</h2>
 <h3 id="21-problem">2.1 Problem</h3>
-<p>Despite widespread discussion, MND lacks a robust estimate of the impact of proximity to "good" primary schools on HDB resale prices. Existing analyses often under-control for flat characteristics, transport accessibility, and neighborhood amenities, making the school-proximity effect hard to isolate.</p>
-<p>Without a clear estimate, MND faces challenges in assessing school-driven demand distortions and designing proportionate policy responses. Non-technical policy officers also need a natural-language interface to explore model predictions without coding.</p>
+<p>MND currently lacks a robust, data-driven estimate of the impact of proximity to "good" primary schools on HDB resale prices. Existing analyses often do not adequately control for confounding factors like flat characteristics, transport accessibility, and neighbourhood amenities, making it difficult to isolate school-proximity effect.</p>
+<p>Without a clear estimate, MND faces challenges in assessing whether school-driven demand contributes to resale-market distortions when designing proportionate policy responses. There is also the need for a natural-language interface to allow non-technical policy officers to explore model predictions and findings without coding.</p>
 <h3 id="22-success-criteria">2.2 Success Criteria</h3>
-<p>Success criteria are defined at both business and operational levels.</p>
-<p>Business-facing criteria is to produce interpretable effect sizes, revealing where school effects are heterogeneous instead of assuming a single national premium. THis is to  provide evidence that can support policy discussions on housing affordability, neighborhood demand pressure, and planning trade-offs.</p>
-<p>Operational criteria is to build a reproducible geospatial feature pipeline, preserve traceability of design choices across scripts and branches.</p>
+<p>Success is evaluated along two dimensions:</p>
+<p>From a technical standpoint, the project should produce credible estimates of the price premium associated with proximity to high-demand primary schools.</p>
+<p>Specifically:</p>
+<p>Estimated school-proximity effects should be statistically significant at conventional levels (e.g. p &lt; 0.05)</p>
+<p>The 95% confidence interval for the estimated premium should be reasonably tight, with a total width below 5 percentage points, indicating sufficient precision for policy interpretation.</p>
+<p>Results should be robust across specifications, meaning that the sign and magnitude of the school effect do not change drastically when additional controls are introduced.</p>
+<p>From a policy perspective, success is defined by the ability to generate actionable and interpretable insights. Outputs should be presented in a form that is understandable to non-technical stakeholders, including estimated premiums in both percentage and dollar terms.</p>
 <h3 id="23-assumptions">2.3 Assumptions</h3>
-<p>This report and the current implementation rely on a set of material assumptions.</p>
-<p>First, "good school" is operationalized using top schools by subscription pressure (applicants/vacancies), with additional curation based on school characteristics (for example GEP and SAP). This combines ranking signals with judgment-based classification.</p>
-<p>Second, in the optimized OneMap routing pipeline, to reduce the number of required API calls, OneMap routing is reserved for nearest-distance features while threshold-count features use Euclidean approximations for tractability. This is an explicit engineering trade-off between route realism and runtime/quota constraints.</p>
-<p>Finally, causal interpretation remains conditional. Baseline hedonic and boundary designs reduce confounding but cannot eliminate sorting effects, so estimates should be interpreted carefully.</p>
-<h3 id="24-stakeholder-to-method-mapping">2.4 Stakeholder-to-Method Mapping</h3>
-<p>Stakeholder mapping keeps outputs decision-focused across model owners, policy analysts, and data maintainers. Model owners prioritize diagnostics, policy analysts prioritize effect heterogeneity and uncertainty, and data maintainers prioritize rerun-safe pipelines and traceability.</p>
-<h3 id="25-data-and-external-services">2.5 Data and External Services</h3>
-<p>The pipeline uses transactional, geospatial, and amenity data from upstream providers.</p>
-<table>
-<thead>
-<tr>
-<th>Feature</th>
-<th>Description</th>
-<th>Link</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>MRT Station Exits</td>
-<td>MRT exit points plus MRT/LRT line metadata.</td>
-<td>MRT locations: <a href="https://data.gov.sg/datasets?query=MRT&amp;resultId=d_b39d3a0871985372d7e1637193335da5">data.gov.sg MRT dataset</a>; MRT lines: <a href="https://www.kaggle.com/datasets/lzytim/full-list-of-mrt-and-lrt-stations-in-singapore">Kaggle MRT/LRT stations in Singapore</a></td>
-</tr>
-<tr>
-<td>Bus Stops</td>
-<td>Bus-stop point layer.</td>
-<td><a href="https://data.gov.sg/datasets/d_3f172c6feb3f4f92a2f47d93eed2908a/view">data.gov.sg bus stop locations</a></td>
-</tr>
-<tr>
-<td>Shopping Malls</td>
-<td>Mall point layer.</td>
-<td><a href="https://www.kaggle.com/datasets/karthikgangula/shopping-mall-coordinates">Kaggle shopping mall coordinates</a></td>
-</tr>
-<tr>
-<td>Supermarkets</td>
-<td>Supermarket point layer.</td>
-<td><a href="https://data.gov.sg/datasets/d_cac2c32f01960a3ad7202a99c27268a0/view">data.gov.sg supermarket locations</a></td>
-</tr>
-<tr>
-<td>Hawker Centres</td>
-<td>Hawker-centre point layer.</td>
-<td><a href="https://data.gov.sg/datasets/d_a57a245b3cf3ec76ad36d55393a16e97/view">data.gov.sg hawker centre locations</a></td>
-</tr>
-<tr>
-<td>Parks</td>
-<td>Park geospatial layer.</td>
-<td><a href="https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view">data.gov.sg parks dataset</a></td>
-</tr>
-<tr>
-<td>URA Master Plan</td>
-<td>Land-use parcel layer for polygon assignment.</td>
-<td><a href="https://data.gov.sg/datasets?query=URA+master&amp;resultId=d_90d86daa5bfaa371668b84fa5f01424f">data.gov.sg URA Master Plan dataset</a></td>
-</tr>
-<tr>
-<td>HDB Existing Buildings</td>
-<td>HDB building polygons for point-in-polygon matching.</td>
-<td><a href="https://data.gov.sg/datasets?query=HDB+building&amp;resultId=d_16b157c52ed637edd6ba1232e026258d">data.gov.sg HDB existing buildings dataset</a></td>
-</tr>
-</tbody>
-</table>
-<p>Coverage:</p>
-<ul>
-<li>Total schools in subscription table: <code>179</code></li>
-<li>"Good schools" selected: <code>44</code></li>
-<li>Shopping centres mapped: <code>155</code></li>
-<li>MRT exits tagged: <code>597</code></li>
-<li>HDB polygons loaded / matched address points / unmatched: <code>13,386 / 9,568 / 28</code></li>
-</ul>
-<p>External services: OneMap routing (<code>ONEMAP_API_KEY</code>) and Kaggle access (<code>kagglehub</code>).</p>
-<h1 id="3-methodology">3. Methodology</h1>
+<p>First, the concept of a “good” primary school is classified using observable proxies rather than a single definitive metric, including:</p>
+<p>offers Gifted Education Programme (GEP) or Special Assistance Plan (SAP) status;</p>
+<p>oversubscribed in Phase 2B of the Primary 1 registration exercise;</p>
+<p>affiliation to a secondary school AND also oversubscribed in Phase 2C.</p>
+<p>This definition was designed to reflect both institutional prestige from official programmes and resources, and revealed demand from past balloting data.</p>
+<p>Second, in the OneMap-based routing pipeline, OneMap API calls are used mainly for nearest-distance MRT and mall features, while corresponding 10-minute threshold-count features are computed using Euclidean approximations to keep runtime and API usage tractable. This is a trade-off between route realism and computational or quota constraints.</p>
+<p>Third, causal interpretation remains conditional. While modelling techniques like regression discontinuity design aim to approximate causal inference, they cannot fully eliminate selection effects or unobserved confounders. Hence, results should be interpreted as conditional approximations or local treatment effects, rather than definitive causal estimates.</p>
+<h2 id="3-methodology">3. Methodology</h2>
 <h3 id="31-technical-assumptions">3.1 Technical Assumptions</h3>
-<p>Spatial layers are normalized to WGS84 for ingestion and projected to SVY21 (<code>EPSG:3414</code>) where meter-based operations are required. This ensures consistent buffering and distance logic.</p>
-<p>School boundaries are constructed by joining school points to URA master-plan land-use polygons, with de-duplication rules for repeated URA object IDs. From these cleaned polygons, 1 km and 2 km Euclidean buffers are generated. This comes from the assumption that data is shared across ministries in Singapore, requiring collaboration between URA, MOE and HDB.</p>
-<p>For routing features, the OneMap implementation uses candidate pre-filtering by Euclidean radius and nearest-candidate cap (<code>k</code>). The latest optimization keeps OneMap calls for nearest mall and MRT distances while computing 10-minute count features from Euclidean thresholds. Additional deduplication groups repeated origin coordinates to reduce repeated API calls.</p>
-<p>Model-side, resale price is modeled as <code>log(resale_price)</code> to stabilize variance and permit approximate percentage interpretation through <code>exp(beta)-1</code>. Time effects are absorbed through month fixed effects and location effects through town fixed effects in OLS specifications.</p>
-<h3 id="32-implementation">3.2 Implementation</h3>
-<p>The implementation evolved across branches in the repository:</p>
-<table>
-<thead>
-<tr>
-<th>Branch</th>
-<th>Role in project</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Data-Preprocessing"><code>Data-Preprocessing</code></a></td>
-<td>Geospatial integration and feature engineering pipeline</td>
-</tr>
-<tr>
-<td><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/tree/Hedonic-Model"><code>Hedonic-Model</code></a></td>
-<td>Hedonic regression, boundary RDD, and town-level heterogeneous-effect analysis</td>
-</tr>
-</tbody>
-</table>
-<p>Within <code>Data-Preprocessing</code>, the core geospatial workflow is implemented in:</p>
-<ul>
-<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/join_primary_schools_to_ura_landuse.py"><code>primary_boundaries/join_primary_schools_to_ura_landuse.py</code></a></li>
-<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Data-Preprocessing/primary_boundaries/build_resale_flat_school_dataset_onemaps.py"><code>primary_boundaries/build_resale_flat_school_dataset_onemaps.py</code></a></li>
-</ul>
-<p>Within <code>Hedonic-Model</code>, model estimation is implemented in:</p>
-<ul>
-<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/train_hedonic_model.py"><code>hedonic_model/train_hedonic_model.py</code></a></li>
-<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_school_boundary_rdd.py"><code>hedonic_model/run_school_boundary_rdd.py</code></a></li>
-<li><a href="https://github.com/heehawww/DSA4264_Geospatial_Group6/blob/Hedonic-Model/hedonic_model/run_town_premium_models.py"><code>hedonic_model/run_town_premium_models.py</code></a></li>
-</ul>
-<h3 id="33-end-to-end-project-flow">3.3 End-to-End Project Flow</h3>
-<pre><code class="language-mermaid">flowchart TD
-    A[&quot;Sources&quot;] --&gt; B[&quot;Preprocess&quot;]
-    B --&gt; C[&quot;Features&quot;]
-    C --&gt; D[&quot;Modeling&quot;]
-    D --&gt; E[&quot;Artifacts&quot;]
-    E --&gt; F[&quot;FastAPI&quot;]
-    F --&gt; G[&quot;LLM Layer&quot;]
-    G --&gt; H[&quot;Policy User&quot;]
-    E --&gt; I[&quot;MkDocs&quot;]
-
-    classDef source fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef prep fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef app fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-    classDef output fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
-
-    class A source;
-    class B,C prep;
-    class D,E model;
-    class F,G,H app;
-    class I output;
-</code></pre>
-<h3 id="34-model-workflow">3.4 Model Workflow</h3>
-<pre><code class="language-mermaid">flowchart TD
-    A[&quot;Feature Data&quot;] --&gt; B[&quot;Train/Test&quot;]
-    B --&gt; C[&quot;Ridge&quot;]
-    B --&gt; D[&quot;OLS&quot;]
-    B --&gt; E[&quot;RDD&quot;]
-    B --&gt; F[&quot;Town Premium&quot;]
-    C --&gt; G[&quot;metrics + pipeline&quot;]
-    D --&gt; H[&quot;OLS table&quot;]
-    E --&gt; I[&quot;RDD tables&quot;]
-    F --&gt; J[&quot;Town tables&quot;]
-    G --&gt; K[&quot;API model/predict&quot;]
-    H --&gt; K
-    I --&gt; L[&quot;API rdd/*&quot;]
-    J --&gt; M[&quot;API town-premiums/*&quot;]
-
-    classDef data fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef train fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef model fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef api fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-
-    class A data;
-    class B train;
-    class C,D,E,F,G,H,I,J model;
-    class K,L,M api;
-</code></pre>
-<h3 id="35-model-selection-and-experimental-design">3.5 Model Selection and Experimental Design</h3>
-<p>Ridge regression is used as the primary predictive model because the feature space includes many correlated engineered covariates and one-hot encoded fixed effects. L2 regularization stabilizes coefficients under multicollinearity and improves out-of-sample generalization.</p>
-<p>OLS is retained in parallel for coefficient interpretability. It provides directly readable terms for hypothesis discussion (for example, <code>good_school_within_1km</code> and <code>good_school_count_1km</code>) and supports fixed-effect specifications useful for decomposition and diagnostics.</p>
-<p>RDD is added as a local identification stress test around the 1 km good-school boundary. It does not replace the pooled hedonic model; it checks whether local discontinuities remain after controls and bandwidth restrictions.</p>
-<p>Town-specific models are included because pooled coefficients can mask heterogeneous local effects. In this project, the sign and magnitude of school-associated premiums differ materially across towns.</p>
+<p>The project makes some technical assumptions:</p>
+<p>Spatial layers are normalized to WGS84 for ingestion and projected to SVY21 (EPSG:3414) where meter-based operations are required. This ensures consistent buffering and distance logic.</p>
+<p>School boundaries are constructed by joining school points to URA master-plan land-use polygons, with de-duplication rules for repeated URA object IDs. 1km and 2km Euclidean buffers are subsequently generated. This comes from assuming that data is shared across ministries in Singapore, requiring collaboration between URA, MOE and HDB.</p>
+<p>For routing features, the OneMap implementation uses candidate pre-filtering by Euclidean radius and nearest-candidate cap (k). The latest optimization keeps OneMap calls for nearest mall and MRT distances while computing 10-minute count features from Euclidean thresholds. Additional deduplication groups repeated origin coordinates to reduce repeated API calls.</p>
+<p>Model-wise, resale price is modeled as log(resale_price) to stabilize variance and permit approximate percentage interpretation through exp(beta)-1. Time effects are absorbed through month and location effects through town fixed effects in OLS specifications.</p>
+<h3 id="32-data">3.2 Data</h3>
+<p>| Feature | Description | Link |</p>
+<p>|---|---|---|</p>
+<p>| MRT Station Exits | A GeoJSON that provides vector coordinates of points showing the locations of exits of all MRT stations in Singapore. This is joined with a separate dataset that contains MRT/LRT line information. | MRT locations: <a href="https://data.gov.sg/datasets?query=MRT&amp;resultId=d_b39d3a0871985372d7e1637193335da5">data.gov.sg MRT dataset</a>  MRT lines: <a href="https://www.kaggle.com/datasets/lzytim/full-list-of-mrt-and-lrt-stations-in-singapore">Kaggle MRT/LRT stations in Singapore</a> |</p>
+<p>| Bus Stops | A GeoJSON that provides vector coordinates of bus stop locations in Singapore. | <a href="https://data.gov.sg/datasets/d_3f172c6feb3f4f92a2f47d93eed2908a/view">data.gov.sg bus stop locations</a> |</p>
+<p>| Shopping Malls | A GeoJSON or coordinate dataset that provides vector coordinates of shopping mall locations. | <a href="https://www.kaggle.com/datasets/karthikgangula/shopping-mall-coordinates">Kaggle shopping mall coordinates</a> |</p>
+<p>| Supermarkets | A GeoJSON that provides vector coordinates of supermarket locations in Singapore. | <a href="https://data.gov.sg/datasets/d_cac2c32f01960a3ad7202a99c27268a0/view">data.gov.sg supermarket locations</a> |</p>
+<p>| Hawker Centres | A GeoJSON that provides vector coordinates of NEA market and food centre locations in Singapore. | <a href="https://data.gov.sg/datasets/d_a57a245b3cf3ec76ad36d55393a16e97/view">data.gov.sg hawker centre locations</a> |</p>
+<p>| Parks | A GeoJSON that provides vector coordinates of parks in Singapore. | <a href="https://data.gov.sg/datasets/d_0542d48f0991541706b58059381a6eca/view">data.gov.sg parks dataset</a> |</p>
+<p>| URA Master Plan | A GeoJSON layer that provides vectorised land parcel designation. | <a href="https://data.gov.sg/datasets?query=URA+master&amp;resultId=d_90d86daa5bfaa371668b84fa5f01424f">data.gov.sg URA Master Plan dataset</a> |</p>
+<p>| HDB Existing Buildings | A GeoJSON that provides vector objects of built HDB buildings. | <a href="https://data.gov.sg/datasets?query=HDB+building&amp;resultId=d_16b157c52ed637edd6ba1232e026258d">data.gov.sg HDB existing buildings dataset</a> |</p>
+<p>Current coverage statistics in generated artifacts:</p>
+<p>Total schools in subscription table: 179</p>
+<p>"Good schools" selected: 44</p>
+<p>Shopping centres mapped: 155</p>
+<p>MRT exits tagged: 597</p>
+<p>HDB polygons loaded: 13,386</p>
+<p>Resale address points matched to HDB polygons: 9,568</p>
+<p>Unmatched address points: 28</p>
+<h3 id="33-experimental-design">3.3 Experimental Design</h3>
+<p>The modelling strategy in this project separates price prediction from school-premium estimation.</p>
+<p>A hedonic pricing model was first developed as the main predictive framework for HDB resale prices. Because the feature space contains many correlated engineered features and categorical controls, Ridge regression was used as the final predictive model and L2 regularisation helped stabilise coefficient estimates under multicollinearity. A reduced-feature specification with floor-area rebalancing was ultimately selected because it achieved the strongest overall holdout performance.</p>
+<p>Concurrently, an OLS hedonic specification was retained for interpretability and diagnostics. From there, school-related coefficients were inspected and as we traced how their sign and magnitude changed as additional controls were introduced. This showed that the pooled hedonic school coefficient was highly unstable across specifications, making it unsuitable as our main estimate of the school premium.</p>
+<p>Thus, the main method used to estimate the school premium was a school-specific regression discontinuity design (RDD) around the 1 km school boundary. This provides a more local comparison of flats just inside and outside the admission threshold, making it better suited than the pooled hedonic model for identifying school-related price effects. A pooled interaction-based RDD was then used to compare whether the boundary premium differs between good and non-good schools.</p>
+<p>The experimental workflow has two layers: feature engineering and modelling.</p>
 <p>At feature-engineering level, the sequence is:</p>
-<ol>
-<li>Build school-boundary entities by joining school points to URA polygons.</li>
-<li>Construct 1 km and 2 km school buffers and classify school tier.</li>
-<li>Match resale address points to HDB polygons.</li>
-<li>For each polygon-linked address, compute school exposure counts (<code>school_count_*</code>, <code>good_school_count_*</code>) by buffer intersection.</li>
-<li>Compute accessibility features (nearest mall and MRT walking distance, and nearby amenity counts).</li>
-<li>Export a transaction-level table with all engineered covariates.</li>
-</ol>
-<p>At modelling level (<code>Hedonic-Model</code> branch), three complementary strategies are used:</p>
-<ol>
-<li>Predictive plus interpretable hedonic models: Ridge for predictive stability and OLS for coefficient interpretation.</li>
-<li>Boundary RDD around the good-school 1 km cutoff: local linear specifications with increasing bandwidths and controls.</li>
-<li>Town-specific regressions: separate models for heterogeneous premium estimation by town.</li>
-</ol>
+<p>Build school-boundary entities by joining school points to URA polygons.</p>
+<p>Construct 1km and 2km school buffers and classify school tier.</p>
+<p>Match resale address points to HDB polygons.</p>
+<p>For each polygon-linked address, compute school exposure counts (school_count_<em>, good_school_count_</em>) by buffer intersection.</p>
+<p>Compute accessibility features (nearest mall and MRT walking distance, and nearby amenity counts).</p>
+<p>Export a transaction-level table with all engineered covariates.</p>
+<p>At modelling level (Hedonic-Model branch), three complementary strategies are used:</p>
+<p>Predictive and interpretable hedonic models: Ridge for predictive stability and OLS for coefficient interpretation;</p>
+<p>School-specific boundary RDD: local linear specifications with multiple bandwidths and controlled versus uncontrolled variants;</p>
+<p>Town-level regressions: separate models for heterogeneous premium estimation by town.</p>
+<p>The hedonic model thus provides broad price prediction and association patterns, the RDD serves as the main local framework for estimating school premiums.</p>
 <p>Method alternatives were considered but not prioritized in this phase:</p>
 <table>
 <thead>
@@ -288,213 +168,114 @@
 </tr>
 </tbody>
 </table>
-<h1 id="4-findings">4. Findings</h1>
+<p>These alternatives were tested conceptually, but did not improve model usefulness enough relative to the chosen stack in this project phase.</p>
+<h2 id="4-findings">4. Findings</h2>
 <h3 id="41-results">4.1 Results</h3>
-<p>The engineered dataset contains <code>223,550</code> resale rows and 27 columns.</p>
-<ul>
-<li>Share of transactions with at least one good school within 1 km: <code>54.2%</code></li>
-<li>Mean <code>good_school_count_1km</code>: <code>0.61</code></li>
-<li>Mean <code>school_count_1km</code>: <code>3.63</code></li>
-<li>Median nearest mall walking distance: <code>851 m</code></li>
-<li>Median nearest MRT walking distance: <code>681 m</code></li>
-</ul>
-<p><img alt="Town distribution" src="../assets/figures/plot_a_town_distribution_top.png" />
-Transactions are concentrated in a few towns (notably Sengkang and Punggol), so pooled effects are shaped by these submarkets.</p>
-<p><img alt="Flat type distribution" src="../assets/figures/plot_b_flat_type_distribution.png" />
-4-room and 5-room flats dominate the sample, so inference is strongest for mass-market segments.</p>
-<p><img alt="Resale price distribution" src="../assets/figures/plot_c1_price_hist_all.png" />
-Resale prices are right-skewed, supporting <code>log(resale_price)</code> to stabilize variance.</p>
-<p>From hedonic model evaluation outputs:</p>
-<table>
-<thead>
-<tr>
-<th>Metric</th>
-<th style="text-align: right;">Value</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td>Train R2 (log scale)</td>
-<td style="text-align: right;">0.909</td>
-</tr>
-<tr>
-<td>Test R2 (log scale)</td>
-<td style="text-align: right;">0.915</td>
-</tr>
-<tr>
-<td>Test RMSE (SGD)</td>
-<td style="text-align: right;">58,568.63</td>
-</tr>
-<tr>
-<td>Test MAE (SGD)</td>
-<td style="text-align: right;">43,845.37</td>
-</tr>
-<tr>
-<td>OLS premium estimate for <code>good_school_within_1km</code></td>
-<td style="text-align: right;">-1.62%</td>
-</tr>
-</tbody>
-</table>
-<p>Model protocol:</p>
-<ul>
-<li>Temporal train-test split (no random shuffle): last 12 months held out.</li>
-<li>Training rows <code>200,744</code> (<code>89.8%</code>), test rows <code>22,806</code> (<code>10.2%</code>).</li>
-<li>Cross-validation was not used in this baseline; Ridge used fixed <code>alpha=1.0</code>.</li>
-<li>ANOVA-style global variance test from OLS: <code>F = 7887</code>, <code>Prob(F) = 0.00</code>, so regressors are jointly significant.</li>
-</ul>
-<p><code>Test R2 = 0.915</code> means 91.5% of holdout variation in <code>log(resale_price)</code> is explained; this is predictive fit, not causal proof.</p>
-<p>Key significant variables from OLS:</p>
-<ul>
-<li><code>floor_area_sqm</code>: <code>+0.00834</code> (p &lt; 1e-40)</li>
-<li><code>storey_mid</code>: <code>+0.00742</code> (p &lt; 1e-40)</li>
-<li><code>ln_nearest_mrt_walking_distance_m</code>: <code>-0.02557</code> (p &lt; 1e-40)</li>
-<li><code>mrt_unique_lines_within_10min_walk</code>: <code>+0.03874</code> (p &lt; 1e-40)</li>
-<li><code>good_school_within_1km</code>: <code>-0.0164</code> (p &lt; 1e-20)</li>
-<li><code>good_school_count_1km</code>: <code>+0.0088</code> (p &lt; 1e-9)</li>
-<li><code>pscore</code>: not used as a standalone regressor.</li>
-</ul>
-<p>At the sample median price (about SGD 495k), <code>-1.62%</code> is about <code>-SGD 8.0k</code>, while <code>+0.88%</code> per additional good school within 1 km is about <code>+SGD 4.4k</code>.</p>
-<p>Table 4.1 (school-specific local RDD sample) illustrates school-level heterogeneity:</p>
+<h3 id="school-specific-rdd-performance">School-Specific RDD Performance</h3>
 <table>
 <thead>
 <tr>
 <th>School Name</th>
 <th>Group</th>
-<th style="text-align: right;">Inside_n</th>
-<th style="text-align: right;">Outside_n</th>
-<th style="text-align: right;">Premium ($) Mean</th>
-<th style="text-align: right;">Premium (%)</th>
+<th>Inside_n</th>
+<th>Outside_n</th>
+<th>Premium ($) Mean</th>
+<th>Premium (%)</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td>Admiralty Primary School</td>
 <td>good</td>
-<td style="text-align: right;">832</td>
-<td style="text-align: right;">261</td>
-<td style="text-align: right;">7,512.06</td>
-<td style="text-align: right;">1.4753</td>
+<td>832</td>
+<td>261</td>
+<td>7512.058518</td>
+<td>1.475288</td>
 </tr>
 <tr>
 <td>Ahmad Ibrahim Primary School</td>
-<td>nongood</td>
-<td style="text-align: right;">465</td>
-<td style="text-align: right;">737</td>
-<td style="text-align: right;">-2,995.15</td>
-<td style="text-align: right;">-0.6386</td>
+<td>non good</td>
+<td>465</td>
+<td>737</td>
+<td>-2995.15129</td>
+<td>-0.6386197</td>
 </tr>
 <tr>
 <td>Ai Tong School</td>
 <td>good</td>
-<td style="text-align: right;">331</td>
-<td style="text-align: right;">428</td>
-<td style="text-align: right;">-12,607.10</td>
-<td style="text-align: right;">-2.2545</td>
+<td>331</td>
+<td>428</td>
+<td>-12607.09518</td>
+<td>-2.2545344</td>
 </tr>
 <tr>
 <td>Alexandra Primary School</td>
-<td>nongood</td>
-<td style="text-align: right;">730</td>
-<td style="text-align: right;">357</td>
-<td style="text-align: right;">9,192.20</td>
-<td style="text-align: right;">1.1975</td>
+<td>non good</td>
+<td>730</td>
+<td>357</td>
+<td>9192.199613</td>
+<td>1.197531</td>
 </tr>
 </tbody>
 </table>
-<p>School-level results are heterogeneous: several schools show positive boundary premiums, while others are weak or negative.</p>
-<p>At the controlled <code>100m</code> bandwidth, grouped RDD showed a higher descriptive mean premium near good schools (<code>SGD 8,605</code>) than non-good schools (<code>SGD 4,803</code>). However, the pooled interaction-based controlled RDD did not find this difference statistically significant (<code>p = 0.138</code>).</p>
-<ul>
-<li>Raw-only and partially controlled specs show negative coefficients.</li>
-<li>After adding time and town fixed effects, the sign can attenuate or flip.</li>
-<li>Adding full school-count terms reintroduces negative coefficient on the binary indicator, while marginal count effect remains positive.</li>
-</ul>
+<p>The results show substantial heterogeneity across schools. Most schools exhibit sizeable, positive local premiums, indicating that flats just inside the 1km boundary command higher resale prices than comparable flats just outside. Other schools show smaller or statistically weak effects, and a few show negative estimates. This heterogeneity suggests that the school premium is not uniform across Singapore, but depends heavily on the specific school and the local neighbourhood market. As a result, a single national school-premium estimate would mask meaningful local variation.</p>
+<h3 id="from-hedonic-outputs-hedonic_modeloutputsmetricsjson">From hedonic outputs (hedonic_model/outputs/metrics.json):</h3>
 <table>
 <thead>
 <tr>
-<th>Specification</th>
-<th style="text-align: right;">Bandwidth (m)</th>
-<th style="text-align: right;">Sample size</th>
-<th style="text-align: right;">Cutoff premium (%)</th>
-<th style="text-align: right;">p-value</th>
+<th>Metric</th>
+<th>Value</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>Uncontrolled</td>
-<td style="text-align: right;">100</td>
-<td style="text-align: right;">32,185</td>
-<td style="text-align: right;">-1.71</td>
-<td style="text-align: right;">0.0289</td>
+<td>Train R2 (log scale)</td>
+<td>0.909</td>
 </tr>
 <tr>
-<td>Controlled</td>
-<td style="text-align: right;">100</td>
-<td style="text-align: right;">32,185</td>
-<td style="text-align: right;">+0.34</td>
-<td style="text-align: right;">0.1216</td>
+<td>Test R2 (log scale)</td>
+<td>0.915</td>
 </tr>
 <tr>
-<td>School fixed effects</td>
-<td style="text-align: right;">100</td>
-<td style="text-align: right;">32,185</td>
-<td style="text-align: right;">+0.24</td>
-<td style="text-align: right;">0.2558</td>
+<td>Test RMSE (SGD)</td>
+<td>58,395.84</td>
+</tr>
+<tr>
+<td>Test MAE (SGD)</td>
+<td>43,620.93</td>
+</tr>
+<tr>
+<td>OLS premium estimate for good_school_within_1km</td>
+<td>-1.62%</td>
 </tr>
 </tbody>
 </table>
-<p>RDD specifications differ by controls: <code>Uncontrolled</code> uses treatment and running-variable terms; <code>Controlled</code> adds structural/market covariates; <code>School fixed effects</code> adds school FE.</p>
-<p>Effect size and significance are specification-sensitive, with uncontrolled estimates more negative than controlled variants.</p>
-<ul>
-<li>Estimated premium per additional good school within 1 km is heterogeneous:</li>
-<li>strongest positive estimate observed in Geylang (<code>+7.56%</code>)</li>
-<li>strongest negative estimate observed in Serangoon (<code>-8.02%</code>)</li>
-<li>Across 20 town models, 17 are significant at 5%, with both positive and negative signs represented.</li>
-</ul>
-<p>Static planning-area sign map (<code>good_school_within_1km</code>; green positive, red negative):</p>
-<p><img alt="Planning-area sign map for good school within 1km" src="../assets/figures/planning_area_good_school_within_1km_sign_static.png" /></p>
-<p>Signs are mixed (<code>10</code> positive, <code>15</code> negative, <code>3</code> near-zero), so effects are not uniformly positive. Positive-sign towns show higher average <code>good_school_count_1km</code> (<code>0.84</code> vs <code>0.60</code>), but this is associative.</p>
-<h1 id="5-discussion-recommendations-and-limitations">5. Discussion, Recommendations, and Limitations</h1>
-<h3 id="51-discussion">5.1 Discussion</h3>
-<p>Pooled effects are unstable across specifications, so "near a good school always raises prices" is not supported once richer controls are added. Town-level heterogeneity is also strong and mixed in sign, arguing against a single citywide premium.</p>
-<p>Local boundary evidence weakens after controls versus uncontrolled comparisons, suggesting part of the raw discontinuity reflects local composition differences. School variables should be interpreted as one component of a broader spatial bundle with accessibility, structural attributes, and time-location effects.</p>
-<h3 id="52-recommendations">5.2 Recommendations</h3>
-<p>For the next phase, use the system as decision support, not a causal pricing engine.</p>
-<ol>
-<li>Report pooled estimates together with town-level ranges and uncertainty intervals.</li>
-<li>Strengthen identification using RDD robustness checks (alternative bandwidths, placebo boundaries, and finer geocoding).</li>
-<li>Re-estimate sensitivity under alternative good-school definitions and improve upstream data quality.</li>
-</ol>
-<p>Policy interpretation should remain local and specification-aware.</p>
-<h3 id="53-limitations-bias-risks-and-mitigations">5.3 Limitations, Bias Risks, and Mitigations</h3>
-<p>Main limitations are location granularity (address points, not unit coordinates), school-quality proxy risk, residual spatial confounding, mixed distance metrics, and possible selection effects from dropped unmatched rows.</p>
-<p>Current mitigations include time and town fixed effects, nested specification tracing, multi-bandwidth local RDD checks, and chunked rerun logic. Future work should prioritize finer geocoding, placebo-boundary tests, and school-definition robustness sweeps.</p>
-<h1 id="6-system-architecture">6. System Architecture</h1>
-<h3 id="61-overview">6.1 Overview</h3>
-<p>The architecture has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer.</p>
-<h3 id="62-model-serving">6.2 Model Serving</h3>
-<p>Models are trained offline and served from serialized artifacts and precomputed analytical tables in the API data layer. Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.</p>
-<h3 id="63-llm-interface">6.3 LLM Interface</h3>
-<pre><code class="language-mermaid">flowchart LR
-    U[&quot;User Question&quot;] --&gt; F[&quot;Frontend Chat Input&quot;]
-    F &lt;--&gt; L[&quot;LLM Parser&quot;]
-    L --&gt; T[&quot;Agent Tools&quot;]
-    T --&gt; B[&quot;Backend API&quot;]
-    B &lt;--&gt; M[&quot;Model/Data Lookup&quot;]
-    B --&gt; L
-    F --&gt; R[&quot;User Response&quot;]
-
-    classDef user fill:#e3f2fd,stroke:#1e88e5,color:#0d47a1;
-    classDef app fill:#e8f5e9,stroke:#43a047,color:#1b5e20;
-    classDef llm fill:#fff8e1,stroke:#f9a825,color:#e65100;
-    classDef backend fill:#f3e5f5,stroke:#8e24aa,color:#4a148c;
-    classDef data fill:#fbe9e7,stroke:#f4511e,color:#bf360c;
-
-    class U,R user;
-    class F app;
-    class L,T llm;
-    class B backend;
-    class M data;
-</code></pre>
+<h3 id="good-school-effect">‘Good’ School Effect</h3>
+<p>To assess whether ‘good’ schools command larger local housing premiums than ‘non-good’ schools, the school-specific RDD estimates were grouped according to our school classification and compared at the preferred controlled 100m bandwidth.</p>
+<p>Under this specification, the mean estimated local boundary premium was approximately S$8,605 for good schools, compared with S$4,803 for non-good schools. This implies that the average local boundary premium was about S$3,802 higher for good schools.</p>
+<p>However, a higher average does not necessarily imply a statistically significant difference. To test this more formally, a pooled interaction-based RDD was estimated at the transaction level, where the treatment effect at the school boundary was allowed to vary according to whether the school was classified as ‘good’. Under the controlled 100m specification, this interaction model estimated an additional premium of approximately 0.35%, or around S$1,837 at the local mean resale price, for ‘good’ schools relative to ‘non-good’ schools. However, this difference was not statistically significant at conventional levels (p = 0.138).</p>
+<p>Taken together, these results suggest that the premium near good schools is descriptively larger in dollar terms, but the evidence is not strong enough under the most local controlled specification to conclude that the difference between ‘good’ and ‘non-good’ schools is statistically significant. This may reflect substantial heterogeneity across schools, as well as the fact that even within narrow bandwidths, local housing resale prices remain noisy and uneven.</p>
+<h3 id="42-discussion">4.2 Discussion</h3>
+<p>From a business perspective, the results suggest that proximity to high-demand primary schools does influence HDB resale prices, but the effect is modest, uneven, and highly dependent on local context. This implies that school-related housing demand may contribute to resale price pressure in specific neighbourhoods. Thus, policy responses should be targeted and location-sensitive, rather than based on the assumption that all good schools generate the same level of housing-market distortion.</p>
+<p>The technical results also translate into two forms of business value. First, the hedonic model achieved strong predictive performance, with out-of-sample <code>R²</code> above <code>0.9</code>, allowing the system to provide credible resale price estimates for policy exploration and scenario analysis. Second, the RDD findings show that while good schools have a higher average local premium descriptively, the difference is not always statistically significant under the strictest local controlled specification. This means that school access is possibly relevant to resale prices and identifies where localised pressure may exist, but is likely also affected and eclipsed by other location factors. Thus, a point of focus going forward lies in improving visibility into where school-related demand may matter, while the main cost is that policy interpretation must remain cautious and specification-aware.</p>
+<p>4.3 Recommendations</p>
+<p>For the next phase, the project should not yet be treated as a fully operationally-ready engine for estimating school premiums. Instead, it is better as a decision-support and exploratory analysis tool. The predictive hedonic model is strong enough to support internal price estimation and scenario exploration, while the school-specific RDD results are useful for highlighting where local school-related housing pressure may be present, but only to be used with caution rather than as a direct basis for policy intervention.</p>
+<p>From a data and modelling perspective, several improvements could strengthen future versions. First, adopt a more tiered reporting standard for policy users by presenting pooled estimates alongside town-specific ranges and uncertainty intervals, so that results are not over-generalised into one universal premium. Additionally, the RDD analysis would benefit from stronger local comparability checks and if possible, more precise geolocation than address-point matching. Future work could potentially also prioritise richer upstream datasets, especially variables that are currently missing but likely important for price formation, such as housing conditions or more time-sensitive school demand information.</p>
+<p>Overall, we recommended retaining the current system as a useful internal analytical tool, while treating further deployment, richer data collection, and stronger identification or causal checks as the priority for the next project phase.</p>
+<h3 id="44-limitations-bias-risks-and-mitigations">4.4 Limitations, Bias Risks, and Mitigations</h3>
+<p>This study has several limitations. First, the definition of a ‘good’ primary school is based on observable proxies and may not fully capture how households perceive school quality. Different families may value schools for different reasons, including reputation, academic outcomes, or programme offerings, some of which are not directly observable or easily quantifiable. To mitigate this, the classification was designed to combine both institutional markers and revealed demand, but it should still be interpreted as an operational grouping rather than a definitive ranking.</p>
+<p>Second, the analysis assumes reasonable cross-agency consistency across HDB, MOE, URA, and geospatial datasets, such that land use, school locations, and building references align sufficiently for feature construction. The walking-distance variables also assume that the underlying routing and map layers are accurate and up to date. In practice, the project uses currently available geospatial layers as proxies for conditions over the <code>2017–2025</code> transaction period, which introduces possible temporal mismatch. For example, some amenities, routes, or transport connections used in the model may not have existed in the same form at the time of earlier transactions. This risk was mitigated by using consistent and well-documented data sources, but some measurement error may remain.</p>
+<p>Finally, some housing characteristics that may materially affect resale prices are not observed in the available data, including renovation quality, interior condition, unit orientation, and view. As a result, some residual variation in resale prices remains unexplained. This limitation is partly addressed by the strong predictive performance of the final hedonic model, but it cannot be eliminated entirely without richer property-level data.</p>
+<h2 id="5-system-architecture">5. System Architecture</h2>
+<h3 id="51-overview">5.1 Overview</h3>
+<p>The intended architecture has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer. The backend (api branch) handles retrieval, filtering, and inference; artifacts are precomputed offline and loaded at runtime.</p>
+<h3 id="52-model-serving">5.2 Model Serving</h3>
+<p>Models are trained offline and served from serialized artifacts (ridge_pipeline.pkl, metrics.json, ols_coefficients.csv, and RDD/town-premium tables under data/ on the api branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.</p>
+<h3 id="53-llm-interface">5.3 LLM Interface</h3>
+<p>{</p>
+<p>"mermaid": "flowchart LR\n    U[\"User Question\"] --&gt; F[\"Frontend Chat Input\"]\n    F &lt;--&gt; L[\"LLM Parser\"]\n    L --&gt; T[\"Agent Tools\"]\n    T --&gt; B[\"Backend API\"]\n    B &lt;--&gt; D[\"Model/data look up\"]\n    B --&gt; L\n    F --&gt; R[\"User Response\"]"</p>
+<p>}</p>
+<p>Natural-language queries are mapped to endpoint intents and routed to backend/model outputs. Flow: User -&gt; LLM/parser -&gt; backend -&gt; model/artifact -&gt; response.</p>
               
             </div>
           </div><footer>
