@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
 
@@ -104,9 +104,7 @@ def build_hdb_agent(model_name: str | None = None):
         month_to: str | None = None,
         min_resale_price: float | None = None,
         max_resale_price: float | None = None,
-        min_good_school_count_1km: float | None = None,
-        max_good_school_count_1km: float | None = None,
-        group_by: str | None = None,
+        group_by: Literal["town", "flat_type", "flat_model", "month", "storey_range", "street_name"] | None = None,
         include_rows: bool = False,
         limit: int = 10,
     ) -> dict[str, Any]:
@@ -120,8 +118,6 @@ def build_hdb_agent(model_name: str | None = None):
             "month_to": month_to,
             "min_resale_price": min_resale_price,
             "max_resale_price": max_resale_price,
-            "min_good_school_count_1km": min_good_school_count_1km,
-            "max_good_school_count_1km": max_good_school_count_1km,
             "group_by": group_by,
         }
         result = {"summary": ctx.deps.api.get("/resales/summary", params)}
