@@ -342,17 +342,17 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="School-specific boundary RDD around 1km school cutoffs")
     parser.add_argument(
         "--transactions-csv",
-        default="walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv",
+        default="data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv",
         help="Transaction-level feature CSV",
     )
     parser.add_argument(
         "--points-geojson",
-        default="primary_boundaries/outputs/resale_address_points_matched_with_school_counts.geojson",
+        default="data/feature_engineering/outputs/resale_address_points_matched_with_school_counts.geojson",
         help="GeoJSON of matched HDB address points",
     )
     parser.add_argument(
         "--buffers-geojson",
-        default="primary_boundaries/outputs/primary_school_boundaries_buffer_1km.geojson",
+        default="data/feature_engineering/outputs/primary_school_boundaries_buffer_1km.geojson",
         help="GeoJSON of 1km school buffers",
     )
     parser.add_argument(

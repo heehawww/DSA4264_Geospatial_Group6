@@ -52,6 +52,7 @@ coverage.xml
 .pytest_cache/
 cover/
 .python-version
+.uv-cache
 
 # Translations
 *.mo
@@ -207,11 +208,10 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
-walking time to nearest xx/outputs/*.csv
 
-# Project geospatial data artifacts (large/generated)
-primary_boundaries/cache/
-primary_boundaries/outputs/
+# Project generated artifacts
+feature_engineering/steps/primary_boundaries/outputs/
+feature_engineering/steps/walkability/outputs/
 hedonic_model/outputs/
 hedonic_model/rdd_outputs/
 hedonic_model/scored_outputs/
@@ -223,5 +223,4 @@ hedonic_model/weighted_outputs/
 hedonic_model/benchmark_outputs/
 outputs/
 outputs/onemap/
-primary_boundaries/inputs/*
-!primary_boundaries/inputs/README.md
+primary_school_scrape/schools.csv

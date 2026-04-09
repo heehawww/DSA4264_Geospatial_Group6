@@ -6,7 +6,7 @@ This module trains a baseline hedonic resale-price model from the preprocessed f
 
 Default input:
 
-`walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv`
+`data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv`
 
 The script expects the following groups of columns:
 
@@ -59,7 +59,7 @@ Optional arguments:
 
 ```bash
 python3 hedonic_model/train_hedonic_model.py \
-  --input-csv "walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv" \
+  --input-csv "data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv" \
   --output-dir hedonic_model/outputs \
   --test-months 12 \
   --feature-spec reduced \
@@ -109,9 +109,9 @@ python3 hedonic_model/run_school_boundary_rdd.py
 
 Default inputs:
 
-- `walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv`
-- `primary_boundaries/outputs/resale_address_points_matched_with_school_counts.geojson`
-- `primary_boundaries/outputs/primary_school_boundaries_buffer_1km.geojson`
+- `data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv`
+- `data/feature_engineering/outputs/resale_address_points_matched_with_school_counts.geojson`
+- `data/feature_engineering/outputs/primary_school_boundaries_buffer_1km.geojson`
 
 Default outputs in `hedonic_model/rdd_outputs/`:
 

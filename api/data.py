@@ -21,31 +21,32 @@ from hedonic_model.train_hedonic_model import (
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = BASE_DIR / "data"
+API_DATA_DIR = DATA_DIR / "api"
 
-FEATURE_DATASET_PATH = DATA_DIR / "resale_flats_with_school_buffer_counts_with_walkability.csv"
-RAW_RESALE_DATASET_PATH = DATA_DIR / "resale_flat_prices.csv"
+FEATURE_DATASET_PATH = API_DATA_DIR / "resale_flats_with_school_buffer_counts_with_walkability.csv"
+RAW_RESALE_DATASET_PATH = API_DATA_DIR / "resale_flat_prices.csv"
 RAW_RESALE_DATASET_LEGACY_PATH = DATA_DIR / "resale_hdbs_raw.csv"
 
-METRICS_PATH = DATA_DIR / "metrics.json"
-FEATURE_IMPORTANCE_PATH = DATA_DIR / "feature_importance_top.csv"
-OLS_COEFFICIENTS_PATH = DATA_DIR / "ols_coefficients.csv"
-RIDGE_PIPELINE_PATH = DATA_DIR / "ridge_pipeline.pkl"
+METRICS_PATH = API_DATA_DIR / "metrics.json"
+FEATURE_IMPORTANCE_PATH = API_DATA_DIR / "feature_importance_top.csv"
+OLS_COEFFICIENTS_PATH = API_DATA_DIR / "ols_coefficients.csv"
+RIDGE_PIPELINE_PATH = API_DATA_DIR / "ridge_pipeline.pkl"
 
-RDD_RESULTS_PATH = DATA_DIR / "school_specific_rdd_results.csv"
-RDD_COEFFICIENTS_PATH = DATA_DIR / "school_specific_rdd_coefficients.csv"
-RDD_SKIPPED_PATH = DATA_DIR / "school_specific_rdd_skipped.csv"
-RDD_GROUP_COMPARISON_RESULTS_PATH = DATA_DIR / "school_group_interaction_results.csv"
-RDD_GROUP_COMPARISON_COEFFICIENTS_PATH = DATA_DIR / "school_group_interaction_coefficients.csv"
-RDD_SUMMARY_PATH = DATA_DIR / "rdd_summary.json"
+RDD_RESULTS_PATH = API_DATA_DIR / "school_specific_rdd_results.csv"
+RDD_COEFFICIENTS_PATH = API_DATA_DIR / "school_specific_rdd_coefficients.csv"
+RDD_SKIPPED_PATH = API_DATA_DIR / "school_specific_rdd_skipped.csv"
+RDD_GROUP_COMPARISON_RESULTS_PATH = API_DATA_DIR / "school_group_interaction_results.csv"
+RDD_GROUP_COMPARISON_COEFFICIENTS_PATH = API_DATA_DIR / "school_group_interaction_coefficients.csv"
+RDD_SUMMARY_PATH = API_DATA_DIR / "rdd_summary.json"
 
-TOWN_PREMIUM_RESULTS_PATH = DATA_DIR / "town_premium_results.csv"
-TOWN_PREMIUM_SKIPPED_PATH = DATA_DIR / "town_premium_skipped.csv"
+TOWN_PREMIUM_RESULTS_PATH = API_DATA_DIR / "town_premium_results.csv"
+TOWN_PREMIUM_SKIPPED_PATH = API_DATA_DIR / "town_premium_skipped.csv"
 
-SIGN_TRACE_PATH = DATA_DIR / "good_school_sign_trace.csv"
+SIGN_TRACE_PATH = API_DATA_DIR / "good_school_sign_trace.csv"
 
-BENCHMARK_RESULTS_PATH = DATA_DIR / "benchmark_results.csv"
-BENCHMARK_RESULTS_JSON_PATH = DATA_DIR / "benchmark_results.json"
-BENCHMARK_METADATA_PATH = DATA_DIR / "benchmark_metadata.json"
+BENCHMARK_RESULTS_PATH = API_DATA_DIR / "benchmark_results.csv"
+BENCHMARK_RESULTS_JSON_PATH = API_DATA_DIR / "benchmark_results.json"
+BENCHMARK_METADATA_PATH = API_DATA_DIR / "benchmark_metadata.json"
 
 
 def _safe_json(path: Path) -> dict[str, Any] | list[dict[str, Any]]:

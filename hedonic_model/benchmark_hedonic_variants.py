@@ -197,7 +197,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Benchmark alternative hedonic-model variants")
     parser.add_argument(
         "--input-csv",
-        default="walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv",
+        default="data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv",
         help="Input preprocessed feature CSV",
     )
     parser.add_argument(

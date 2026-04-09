@@ -29,12 +29,12 @@ chatbot_agent = importlib.reload(chatbot_agent)
 PREDICTIONS_PATH = REPO_ROOT / "hedonic_model/outputs/predictions.csv"
 FEATURES_PATH = (
     REPO_ROOT
-    / "walking time to nearest xx/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv"
+    / "data/feature_engineering/outputs/resale_flats_with_school_buffer_counts_with_walkability.csv"
 )
-POINTS_PATH = REPO_ROOT / "primary_boundaries/outputs/resale_address_points_matched_with_school_counts.geojson"
-BUFFER_1KM_PATH = REPO_ROOT / "primary_boundaries/outputs/primary_school_boundaries_buffer_1km.geojson"
-BUFFER_2KM_PATH = REPO_ROOT / "primary_boundaries/outputs/primary_school_boundaries_buffer_2km.geojson"
-BUILDINGS_PATH = REPO_ROOT / "primary_boundaries/outputs/hdb_existing_buildings_layer.geojson"
+POINTS_PATH = REPO_ROOT / "data/feature_engineering/outputs/resale_address_points_matched_with_school_counts.geojson"
+BUFFER_1KM_PATH = REPO_ROOT / "data/feature_engineering/outputs/primary_school_boundaries_buffer_1km.geojson"
+BUFFER_2KM_PATH = REPO_ROOT / "data/feature_engineering/outputs/primary_school_boundaries_buffer_2km.geojson"
+BUILDINGS_PATH = REPO_ROOT / "data/feature_engineering/outputs/hdb_existing_buildings_layer.geojson"
 DEFAULT_API_BASE_URL = os.getenv("HDB_API_BASE_URL", "http://127.0.0.1:8000").rstrip("/")
 
 

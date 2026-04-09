@@ -30,32 +30,32 @@ The API is organized around the final analytical surfaces:
 
 ## Data Loading
 
-The API loads all required artifacts from the repo-level `data/` directory.
+The API loads its required artifacts from `data/api/`.
 
 Current datasets used by the finalized API:
 
-- `data/resale_flat_prices.csv`
-- `data/resale_flats_with_school_buffer_counts_with_walkability.csv`
-- `data/metrics.json`
-- `data/feature_importance_top.csv`
-- `data/ols_coefficients.csv`
-- `data/ridge_pipeline.pkl`
-- `data/school_specific_rdd_results.csv`
-- `data/school_specific_rdd_coefficients.csv`
-- `data/school_specific_rdd_skipped.csv`
-- `data/school_group_interaction_results.csv`
-- `data/school_group_interaction_coefficients.csv`
-- `data/rdd_summary.json`
-- `data/town_premium_results.csv`
-- `data/town_premium_skipped.csv`
-- `data/good_school_sign_trace.csv`
-- `data/benchmark_results.csv`
-- `data/benchmark_results.json`
-- `data/benchmark_metadata.json`
+- `data/api/resale_flat_prices.csv`
+- `data/api/resale_flats_with_school_buffer_counts_with_walkability.csv`
+- `data/api/metrics.json`
+- `data/api/feature_importance_top.csv`
+- `data/api/ols_coefficients.csv`
+- `data/api/ridge_pipeline.pkl`
+- `data/api/school_specific_rdd_results.csv`
+- `data/api/school_specific_rdd_coefficients.csv`
+- `data/api/school_specific_rdd_skipped.csv`
+- `data/api/school_group_interaction_results.csv`
+- `data/api/school_group_interaction_coefficients.csv`
+- `data/api/rdd_summary.json`
+- `data/api/town_premium_results.csv`
+- `data/api/town_premium_skipped.csv`
+- `data/api/good_school_sign_trace.csv`
+- `data/api/benchmark_results.csv`
+- `data/api/benchmark_results.json`
+- `data/api/benchmark_metadata.json`
 
-The raw resale API uses `data/resale_flat_prices.csv` as the current raw resale source.
+The raw resale API uses `data/api/resale_flat_prices.csv` as the current raw resale source.
 
-The prediction API still uses the processed feature table `data/resale_flats_with_school_buffer_counts_with_walkability.csv` for default values and feature engineering because the raw resale file does not contain the amenity and school-walkability features needed by the saved ridge pipeline.
+The prediction API still uses the processed feature table `data/api/resale_flats_with_school_buffer_counts_with_walkability.csv` for default values and feature engineering because the raw resale file does not contain the amenity and school-walkability features needed by the saved ridge pipeline.
 
 ## Endpoint Inventory
 
@@ -82,7 +82,7 @@ Use this first if the agent or frontend needs to inspect what is currently loade
 
 ## Resales
 
-These endpoints are for observed historical resale data from `data/resale_flat_prices.csv`.
+These endpoints are for observed historical resale data from `data/api/resale_flat_prices.csv`.
 
 ### `GET /resales/schema`
 
@@ -156,7 +156,7 @@ These endpoints expose the finalized hedonic model outputs.
 
 Source:
 
-- `data/metrics.json`
+- `data/api/metrics.json`
 
 Use for:
 
@@ -168,7 +168,7 @@ Use for:
 
 Source:
 
-- `data/feature_importance_top.csv`
+- `data/api/feature_importance_top.csv`
 
 Use for:
 
@@ -179,7 +179,7 @@ Use for:
 
 Source:
 
-- `data/ols_coefficients.csv`
+- `data/api/ols_coefficients.csv`
 
 Use for:
 
@@ -206,7 +206,7 @@ This endpoint helps the agent explain what inputs users can provide.
 
 ### `POST /predict`
 
-Uses the saved ridge regression pipeline in `data/ridge_pipeline.pkl`.
+Uses the saved ridge regression pipeline in `data/api/ridge_pipeline.pkl`.
 
 It:
 
@@ -246,7 +246,7 @@ Use for:
 
 Derived from:
 
-- `data/school_specific_rdd_results.csv`
+- `data/api/school_specific_rdd_results.csv`
 - `data/school_specific_rdd_skipped.csv`
 
 Provides school-level coverage information such as:
@@ -259,7 +259,7 @@ Provides school-level coverage information such as:
 
 Source:
 
-- `data/school_specific_rdd_results.csv`
+- `data/api/school_specific_rdd_results.csv`
 
 This is one of the main analytical endpoints.
 
@@ -368,7 +368,7 @@ Use for:
 
 Source:
 
-- `data/good_school_sign_trace.csv`
+- `data/api/good_school_sign_trace.csv`
 
 Use for:
 
@@ -392,7 +392,7 @@ Provides:
 
 Source:
 
-- `data/benchmark_results.csv`
+- `data/api/benchmark_results.csv`
 
 Use for:
 
