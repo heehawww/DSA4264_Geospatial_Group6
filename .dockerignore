@@ -18,15 +18,3 @@ dist
 .hypothesis
 .nox
 .tox
-feature_engineering/steps/primary_boundaries/outputs
-feature_engineering/steps/walkability/outputs
-hedonic_model/outputs
-hedonic_model/rdd_outputs
-hedonic_model/scored_outputs
-hedonic_model/diagnostic_outputs
-hedonic_model/town_outputs
-hedonic_model/rebalanced_outputs
-hedonic_model/reduced_outputs
-hedonic_model/weighted_outputs
-hedonic_model/benchmark_outputs
-primary_school_scrape/schools.csv
