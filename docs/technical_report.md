@@ -214,7 +214,7 @@ Transactions are concentrated in a few towns (notably Sengkang and Punggol), so 
 ![Resale price distribution](assets/figures/plot_c1_price_hist_all.png)
 The resale price distribution is right-skewed with a high-value tail, which supports using `log(resale_price)` to stabilize variance and reduce tail-driven distortion.
 
-From hedonic outputs (`hedonic_model/outputs/metrics.json`):
+From hedonic model evaluation outputs:
 
 | Metric | Value |
 |---|---:|
@@ -258,13 +258,13 @@ The school-level results are clearly heterogeneous: several schools show positiv
 
 At the preferred controlled `100m` bandwidth, the second report's grouped RDD summary showed a higher descriptive mean local premium near good schools (about `SGD 8,605`) than non-good schools (about `SGD 4,803`). However, the pooled interaction-based controlled RDD did not find this good-vs-non-good difference statistically significant at conventional levels (`p = 0.138`), so this gap should be treated as directional rather than conclusive.
 
-From nested specification tracing (`good_school_sign_trace.csv`):
+From nested specification tracing outputs:
 
 - Raw-only and partially controlled specs show negative coefficients.
 - After adding time and town fixed effects, the sign can attenuate or flip.
 - Adding full school-count terms reintroduces negative coefficient on the binary indicator, while marginal count effect remains positive.
 
-Short consolidation table from boundary RDD (`hedonic_model/rdd_outputs/rdd_results.csv`):
+Short consolidation table from boundary RDD outputs:
 
 | Specification | Bandwidth (m) | Sample size | Cutoff premium (%) | p-value |
 |---|---:|---:|---:|---:|
@@ -276,7 +276,7 @@ RDD specifications differ by control intensity: `Uncontrolled` uses treatment an
 
 Effect size and significance are strongly specification-sensitive, with uncontrolled estimates markedly more negative than controlled variants.
 
-From town-level models (`town_premium_results.csv`):
+From town-level model outputs:
 
 - Estimated premium per additional good school within 1 km is heterogeneous:
   - strongest positive estimate observed in Geylang (`+7.56%`)
@@ -289,7 +289,7 @@ Static planning-area sign map (`good_school_within_1km`; green positive, red neg
 
 Short read: signs are mixed (`10` positive, `15` negative, `3` near-zero), so effects are not uniformly positive. Core areas mapped from `CENTRAL AREA` are negative in this run. Positive-sign towns show higher average `good_school_count_1km` (`0.84` vs `0.60`), but this is associative, not causal.
 
-Coefficient table: `docs/assets/data/town_good_school_within_1km_sign_summary.csv`.
+Coefficient table available in the report assets.
 
 # 5. Discussion, Recommendations, and Limitations
 
@@ -323,7 +323,7 @@ The architecture used in the second report has four layers: frontend, FastAPI ba
 
 ### 6.2 Model Serving
 
-Models are trained offline and served from serialized artifacts (`ridge_pipeline.pkl`, `metrics.json`, `ols_coefficients.csv`, and RDD/town-premium tables under `data/` on the `api` branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.
+Models are trained offline and served from serialized artifacts and precomputed analytical tables in the API data layer. Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.
 
 ### 6.3 LLM Interface
 
