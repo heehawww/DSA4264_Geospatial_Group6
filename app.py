@@ -538,8 +538,8 @@ def render_map_legend() -> None:
     st.markdown(
         """
         <div style="display:flex; gap:20px; flex-wrap:wrap; align-items:center; margin:0.25rem 0 0.75rem 0; font-size:0.92rem;">
-          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#d63384; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Flat premium: yes</span>
-          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#f4b6d5; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Flat premium: no</span>
+          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#d63384; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Estimated Premium: yes</span>
+          <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#f4b6d5; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Estimated Premium: no</span>
           <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#228b22; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Good school</span>
           <span><span style="display:inline-block; width:12px; height:12px; border-radius:999px; background:#b46e23; margin-right:6px; border:1px solid rgba(0,0,0,0.15);"></span>Other school</span>
         </div>
