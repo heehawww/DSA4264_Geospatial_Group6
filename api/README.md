@@ -481,3 +481,19 @@ From the repository root:
 ```bash
 uv run uvicorn api.main:app --reload
 ```
+
+## Tests
+
+API endpoint tests live in [tests/test_api.py](/Users/tjiay/Documents/NUS/DSA4264_Geospatial_Group6/tests/test_api.py).
+
+Run them from the repository root with:
+
+```powershell
+python -m unittest discover -s tests -v
+```
+
+If your environment is set up through `uv`, you can also run:
+
+```powershell
+uv run python -m unittest discover -s tests -v
+```
