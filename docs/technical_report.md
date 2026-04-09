@@ -2,9 +2,9 @@
 
 # 1. Context
 
-The Ministry of National Development (MND) is responsible for planning Singapore's land use and ensuring the provision of affordable and accessible public housing. In recent years, HDB resale prices have experienced upward pressure, driven by a combination of supply-demand dynamics and location-based preferences. One key factor influencing buyer behavior is proximity to desirable primary schools.
+The Ministry of National Development (MND) plans Singapore's land use and public housing. HDB resale prices have risen due to supply-demand conditions and location preferences, including proximity to primary schools.
 
-Under the admission framework administered by the Ministry of Education (MOE), priority is given to students living within specified distance bands, especially within 1km of a school. As a result, flats located near "good" primary schools are often perceived to command higher resale prices as households seek to secure admission advantages.
+Under the Ministry of Education (MOE) admission framework, priority is given to students living within distance bands, especially within 1km. As a result, flats near "good" primary schools are often perceived to command higher prices.
 
 This motivates the core policy question: does proximity to "good" primary schools produce a measurable resale premium after controlling for other housing and location factors?
 
@@ -12,9 +12,9 @@ This motivates the core policy question: does proximity to "good" primary school
 
 ### 2.1 Problem
 
-Despite widespread discussion, MND currently lacks a robust, data-driven estimate of the impact of proximity to "good" primary schools on HDB resale prices. Existing analyses often do not adequately control for confounding factors such as flat characteristics, transport accessibility, and neighborhood amenities, making it difficult to isolate the school-proximity effect.
+Despite widespread discussion, MND lacks a robust estimate of the impact of proximity to "good" primary schools on HDB resale prices. Existing analyses often under-control for flat characteristics, transport accessibility, and neighborhood amenities, making the school-proximity effect hard to isolate.
 
-Without a clear estimate, MND faces challenges in assessing whether school-driven demand is contributing to resale-market distortions and in designing proportionate policy responses. In addition, there is a product-accessibility requirement: non-technical policy officers need a natural-language interface to explore model predictions and findings without coding.
+Without a clear estimate, MND faces challenges in assessing school-driven demand distortions and designing proportionate policy responses. Non-technical policy officers also need a natural-language interface to explore model predictions without coding.
 
 ### 2.2 Success Criteria
 
@@ -28,19 +28,19 @@ Operational criteria is to build a reproducible geospatial feature pipeline, pre
 
 This report and the current implementation rely on a set of material assumptions.
 
-First, "good school" is operationalized primarily using the top 59 schools by overall subscription pressure (applicants/vacancies), with consideration to school characteristics such as programs (for example GEP and SAP) in the project curation process. Within our group, we discussed and added schools we feel are good as well. This produces a dataset that combines systematic ranking signals with judgment-based classification choices, resulting in a unique dataset.
+First, "good school" is operationalized using top schools by subscription pressure (applicants/vacancies), with additional curation based on school characteristics (for example GEP and SAP). This combines ranking signals with judgment-based classification.
 
 Second, in the optimized OneMap routing pipeline, to reduce the number of required API calls, OneMap routing is reserved for nearest-distance features while threshold-count features use Euclidean approximations for tractability. This is an explicit engineering trade-off between route realism and runtime/quota constraints.
 
-Finally, causal interpretation remains conditional. The baseline hedonic and local boundary designs reduce confounding but do not fully eliminate sorting effects, so effect estimates should be interpreted with specification awareness.
+Finally, causal interpretation remains conditional. Baseline hedonic and boundary designs reduce confounding but cannot eliminate sorting effects, so estimates should be interpreted carefully.
 
 ### 2.4 Stakeholder-to-Method Mapping
 
-Stakeholder mapping keeps outputs decision-focused across model owners, policy analysts, and data maintainers.
+Stakeholder mapping keeps outputs decision-focused across model owners, policy analysts, and data maintainers. Model owners prioritize diagnostics, policy analysts prioritize effect heterogeneity and uncertainty, and data maintainers prioritize rerun-safe pipelines and traceability.
 
 ### 2.5 Data and External Services
 
-The pipeline uses transactional, geospatial, and amenity data from upstream providers (Kaggle, data.gov.sg, scraping pipelines).
+The pipeline uses transactional, geospatial, and amenity data from upstream providers.
 
 | Feature | Description | Link |
 |---|---|---|
@@ -149,8 +149,6 @@ flowchart TD
     class K,L,M api;
 ```
 
-The modelling stack combines methods with complementary strengths.
-
 ### 3.5 Model Selection and Experimental Design
 
 Ridge regression is used as the primary predictive model because the feature space includes many correlated engineered covariates and one-hot encoded fixed effects. L2 regularization stabilizes coefficients under multicollinearity and improves out-of-sample generalization.
@@ -160,8 +158,6 @@ OLS is retained in parallel for coefficient interpretability. It provides direct
 RDD is added as a local identification stress test around the 1 km good-school boundary. It does not replace the pooled hedonic model; it checks whether local discontinuities remain after controls and bandwidth restrictions.
 
 Town-specific models are included because pooled coefficients can mask heterogeneous local effects. In this project, the sign and magnitude of school-associated premiums differ materially across towns.
-
-The experimental workflow has two layers: feature engineering and modelling.
 
 At feature-engineering level, the sequence is:
 
@@ -178,8 +174,6 @@ At modelling level (`Hedonic-Model` branch), three complementary strategies are 
 2. Boundary RDD around the good-school 1 km cutoff: local linear specifications with increasing bandwidths and controls.
 3. Town-specific regressions: separate models for heterogeneous premium estimation by town.
 
-This layered design is deliberate: the hedonic model gives broad association patterns, RDD provides a local validity stress test, and town-level models expose heterogeneity that pooled coefficients can hide.
-
 Method alternatives were considered but not prioritized in this phase:
 
 | Candidate approach | Why not primary in this phase |
@@ -189,13 +183,11 @@ Method alternatives were considered but not prioritized in this phase:
 | Full causal design only (no predictive model) | Better identification focus but loses practical forecasting and residual diagnostics benefits |
 | One universal treatment premium | Empirically inconsistent with town-level heterogeneity observed in outputs |
 
-These alternatives were tested conceptually, but did not improve model usefulness enough relative to the chosen stack in this project phase.
-
 # 4. Findings
 
 ### 4.1 Results
 
-The engineered dataset in active use contains `223,550` resale rows and 27 columns in the OneMap feature table. Key distributional statistics indicate broad exposure variation:
+The engineered dataset contains `223,550` resale rows and 27 columns.
 
 - Share of transactions with at least one good school within 1 km: `54.2%`
 - Mean `good_school_count_1km`: `0.61`
@@ -203,16 +195,14 @@ The engineered dataset in active use contains `223,550` resale rows and 27 colum
 - Median nearest mall walking distance: `851 m`
 - Median nearest MRT walking distance: `681 m`
 
-Representative descriptive plots:
-
 ![Town distribution](assets/figures/plot_a_town_distribution_top.png)
-Transactions are concentrated in a few towns (notably Sengkang and Punggol), so pooled effects are disproportionately influenced by these high-volume submarkets.
+Transactions are concentrated in a few towns (notably Sengkang and Punggol), so pooled effects are shaped by these submarkets.
 
 ![Flat type distribution](assets/figures/plot_b_flat_type_distribution.png)
-4-room and 5-room flats dominate the sample, so inference is strongest for mass-market flat segments and should be generalized to rarer flat types with caution.
+4-room and 5-room flats dominate the sample, so inference is strongest for mass-market segments.
 
 ![Resale price distribution](assets/figures/plot_c1_price_hist_all.png)
-The resale price distribution is right-skewed with a high-value tail, which supports using `log(resale_price)` to stabilize variance and reduce tail-driven distortion.
+Resale prices are right-skewed, supporting `log(resale_price)` to stabilize variance.
 
 From hedonic model evaluation outputs:
 
@@ -224,14 +214,14 @@ From hedonic model evaluation outputs:
 | Test MAE (SGD) | 43,845.37 |
 | OLS premium estimate for `good_school_within_1km` | -1.62% |
 
-Model analysis protocol in the hedonic run:
+Model protocol:
 
 - Temporal train-test split (no random shuffle): last 12 months held out.
 - Training rows `200,744` (`89.8%`), test rows `22,806` (`10.2%`).
 - Cross-validation was not used in this baseline; Ridge used fixed `alpha=1.0`.
 - ANOVA-style global variance test from OLS: `F = 7887`, `Prob(F) = 0.00`, so regressors are jointly significant.
 
-`Test R2 = 0.915` means about 91.5% of holdout variation in `log(resale_price)` is explained by the model; this is predictive fit, not causal proof. SMOTE was not used (`imblearn` not used; task is regression).
+`Test R2 = 0.915` means 91.5% of holdout variation in `log(resale_price)` is explained; this is predictive fit, not causal proof.
 
 Key significant variables from OLS:
 
@@ -241,11 +231,11 @@ Key significant variables from OLS:
 - `mrt_unique_lines_within_10min_walk`: `+0.03874` (p < 1e-40)
 - `good_school_within_1km`: `-0.0164` (p < 1e-20)
 - `good_school_count_1km`: `+0.0088` (p < 1e-9)
-- `pscore` note: not included as a standalone continuous regressor in this baseline; it is used indirectly via good-school tier/count construction.
+- `pscore`: not used as a standalone regressor.
 
-At the sample median resale price (about SGD 495k), `-1.62%` is roughly `-SGD 8.0k`, while `+0.88%` per additional good school within 1 km is roughly `+SGD 4.4k`. This sign inconsistency means policy teams should not rely on a single pooled premium.
+At the sample median price (about SGD 495k), `-1.62%` is about `-SGD 8.0k`, while `+0.88%` per additional good school within 1 km is about `+SGD 4.4k`.
 
-Table 4.1 from the second report (school-specific local RDD sample) is retained below to show school-level heterogeneity in direction and magnitude:
+Table 4.1 (school-specific local RDD sample) illustrates school-level heterogeneity:
 
 | School Name | Group | Inside_n | Outside_n | Premium ($) Mean | Premium (%) |
 |---|---|---:|---:|---:|---:|
@@ -254,17 +244,13 @@ Table 4.1 from the second report (school-specific local RDD sample) is retained 
 | Ai Tong School | good | 331 | 428 | -12,607.10 | -2.2545 |
 | Alexandra Primary School | nongood | 730 | 357 | 9,192.20 | 1.1975 |
 
-The school-level results are clearly heterogeneous: several schools show positive local boundary premiums, while others are weak or negative. This means a single national "school premium" masks meaningful local variation across catchments.
+School-level results are heterogeneous: several schools show positive boundary premiums, while others are weak or negative.
 
-At the preferred controlled `100m` bandwidth, the second report's grouped RDD summary showed a higher descriptive mean local premium near good schools (about `SGD 8,605`) than non-good schools (about `SGD 4,803`). However, the pooled interaction-based controlled RDD did not find this good-vs-non-good difference statistically significant at conventional levels (`p = 0.138`), so this gap should be treated as directional rather than conclusive.
-
-From nested specification tracing outputs:
+At the controlled `100m` bandwidth, grouped RDD showed a higher descriptive mean premium near good schools (`SGD 8,605`) than non-good schools (`SGD 4,803`). However, the pooled interaction-based controlled RDD did not find this difference statistically significant (`p = 0.138`).
 
 - Raw-only and partially controlled specs show negative coefficients.
 - After adding time and town fixed effects, the sign can attenuate or flip.
 - Adding full school-count terms reintroduces negative coefficient on the binary indicator, while marginal count effect remains positive.
-
-Short consolidation table from boundary RDD outputs:
 
 | Specification | Bandwidth (m) | Sample size | Cutoff premium (%) | p-value |
 |---|---:|---:|---:|---:|
@@ -272,11 +258,9 @@ Short consolidation table from boundary RDD outputs:
 | Controlled | 100 | 32,185 | +0.34 | 0.1216 |
 | School fixed effects | 100 | 32,185 | +0.24 | 0.2558 |
 
-RDD specifications differ by control intensity: `Uncontrolled` uses treatment and running-variable terms only; `Controlled` adds structural/market covariates; `School fixed effects` adds school FE so identification is from within-school boundary variation.
+RDD specifications differ by controls: `Uncontrolled` uses treatment and running-variable terms; `Controlled` adds structural/market covariates; `School fixed effects` adds school FE.
 
-Effect size and significance are strongly specification-sensitive, with uncontrolled estimates markedly more negative than controlled variants.
-
-From town-level model outputs:
+Effect size and significance are specification-sensitive, with uncontrolled estimates more negative than controlled variants.
 
 - Estimated premium per additional good school within 1 km is heterogeneous:
   - strongest positive estimate observed in Geylang (`+7.56%`)
@@ -287,9 +271,7 @@ Static planning-area sign map (`good_school_within_1km`; green positive, red neg
 
 ![Planning-area sign map for good school within 1km](assets/figures/planning_area_good_school_within_1km_sign_static.png)
 
-Short read: signs are mixed (`10` positive, `15` negative, `3` near-zero), so effects are not uniformly positive. Core areas mapped from `CENTRAL AREA` are negative in this run. Positive-sign towns show higher average `good_school_count_1km` (`0.84` vs `0.60`), but this is associative, not causal.
-
-Coefficient table available in the report assets.
+Signs are mixed (`10` positive, `15` negative, `3` near-zero), so effects are not uniformly positive. Positive-sign towns show higher average `good_school_count_1km` (`0.84` vs `0.60`), but this is associative.
 
 # 5. Discussion, Recommendations, and Limitations
 
@@ -319,7 +301,7 @@ Current mitigations include time and town fixed effects, nested specification tr
 
 ### 6.1 Overview
 
-The architecture used in the second report has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer. The backend handles retrieval, filtering, and inference, while artifacts are precomputed offline and loaded at runtime.
+The architecture has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer.
 
 ### 6.2 Model Serving
 
