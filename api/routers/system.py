@@ -19,6 +19,7 @@ def root() -> dict[str, Any]:
         "endpoints": [
             "GET /health",
             "GET /metadata",
+            "GET /schools/good",
             "GET /model/metrics",
             "GET /model/feature-importance",
             "GET /model/coefficients",

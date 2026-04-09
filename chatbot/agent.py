@@ -145,6 +145,21 @@ def build_hdb_agent(model_name: str | None = None):
         }
 
     @agent.tool
+    def get_good_schools_for_town(
+        ctx: RunContext[HDBAgentDeps],
+        town: str,
+        limit: int = 50,
+    ) -> dict[str, Any]:
+        """Return good primary schools linked to a town."""
+        return ctx.deps.api.get(
+            "/schools/good",
+            {
+                "town": town,
+                "limit": max(1, min(limit, 200)),
+            },
+        )
+
+    @agent.tool
     def predict_resale_price(
         ctx: RunContext[HDBAgentDeps],
         payload: dict[str, Any] | None = None,
