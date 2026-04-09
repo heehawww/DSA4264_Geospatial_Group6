@@ -8,7 +8,7 @@ The technical report can be found [here](https://heehawww.github.io/DSA4264_Geos
 
 If you are running locally, you can initialize a Python virtual environment and install the dependencies:
 
-```bash
+```
 python -m venv venv
 source venv/bin/activate
 pip install .
@@ -30,7 +30,7 @@ Do not commit your real `.env` file because it can contain secrets.
 
 From the repository root, activate the virtual environment and start the Streamlit app:
 
-```bash
+```
 streamlit run app.py
 ```
 
@@ -41,8 +41,7 @@ The frontend has two tabs:
 
 For the service-backed chatbot, start the FastAPI backend in a separate terminal before using the chatbot:
 
-```bash
-source venv/bin/activate
+```
 uvicorn api.main:app --reload
 ```
 
@@ -52,7 +51,7 @@ If the API is not running, the map still works, but the chatbot will show that t
 
 From the repository root, build and start both the FastAPI backend and Streamlit frontend:
 
-```bash
+```
 docker compose up --build
 ```
 
@@ -63,7 +62,7 @@ Then open:
 
 If you want to use the LLM-backed chatbot, pass your OpenAI API key when starting Docker:
 
-```bash
+```
 OPENAI_API_KEY=your_key_here docker compose up --build
 ```
 
