@@ -309,7 +309,7 @@ Transactions are concentrated in a few towns (notably Sengkang and Punggol), so 
 4-room and 5-room flats dominate the sample, so inference is strongest for mass-market flat segments and should be generalized to rarer flat types with caution.</p>
 <p><img alt="Resale price distribution" src="../assets/figures/plot_c1_price_hist_all.png" />
 The resale price distribution is right-skewed with a high-value tail, which supports using <code>log(resale_price)</code> to stabilize variance and reduce tail-driven distortion.</p>
-<p>From hedonic outputs (<code>hedonic_model/outputs/metrics.json</code>):</p>
+<p>From hedonic model evaluation outputs:</p>
 <table>
 <thead>
 <tr>
@@ -408,13 +408,13 @@ The resale price distribution is right-skewed with a high-value tail, which supp
 </table>
 <p>The school-level results are clearly heterogeneous: several schools show positive local boundary premiums, while others are weak or negative. This means a single national "school premium" masks meaningful local variation across catchments.</p>
 <p>At the preferred controlled <code>100m</code> bandwidth, the second report's grouped RDD summary showed a higher descriptive mean local premium near good schools (about <code>SGD 8,605</code>) than non-good schools (about <code>SGD 4,803</code>). However, the pooled interaction-based controlled RDD did not find this good-vs-non-good difference statistically significant at conventional levels (<code>p = 0.138</code>), so this gap should be treated as directional rather than conclusive.</p>
-<p>From nested specification tracing (<code>good_school_sign_trace.csv</code>):</p>
+<p>From nested specification tracing outputs:</p>
 <ul>
 <li>Raw-only and partially controlled specs show negative coefficients.</li>
 <li>After adding time and town fixed effects, the sign can attenuate or flip.</li>
 <li>Adding full school-count terms reintroduces negative coefficient on the binary indicator, while marginal count effect remains positive.</li>
 </ul>
-<p>Short consolidation table from boundary RDD (<code>hedonic_model/rdd_outputs/rdd_results.csv</code>):</p>
+<p>Short consolidation table from boundary RDD outputs:</p>
 <table>
 <thead>
 <tr>
@@ -451,7 +451,7 @@ The resale price distribution is right-skewed with a high-value tail, which supp
 </table>
 <p>RDD specifications differ by control intensity: <code>Uncontrolled</code> uses treatment and running-variable terms only; <code>Controlled</code> adds structural/market covariates; <code>School fixed effects</code> adds school FE so identification is from within-school boundary variation.</p>
 <p>Effect size and significance are strongly specification-sensitive, with uncontrolled estimates markedly more negative than controlled variants.</p>
-<p>From town-level models (<code>town_premium_results.csv</code>):</p>
+<p>From town-level model outputs:</p>
 <ul>
 <li>Estimated premium per additional good school within 1 km is heterogeneous:</li>
 <li>strongest positive estimate observed in Geylang (<code>+7.56%</code>)</li>
@@ -461,7 +461,7 @@ The resale price distribution is right-skewed with a high-value tail, which supp
 <p>Static planning-area sign map (<code>good_school_within_1km</code>; green positive, red negative):</p>
 <p><img alt="Planning-area sign map for good school within 1km" src="../assets/figures/planning_area_good_school_within_1km_sign_static.png" /></p>
 <p>Short read: signs are mixed (<code>10</code> positive, <code>15</code> negative, <code>3</code> near-zero), so effects are not uniformly positive. Core areas mapped from <code>CENTRAL AREA</code> are negative in this run. Positive-sign towns show higher average <code>good_school_count_1km</code> (<code>0.84</code> vs <code>0.60</code>), but this is associative, not causal.</p>
-<p>Coefficient table: <code>docs/assets/data/town_good_school_within_1km_sign_summary.csv</code>.</p>
+<p>Coefficient table available in the report assets.</p>
 <h1 id="5-discussion-recommendations-and-limitations">5. Discussion, Recommendations, and Limitations</h1>
 <h3 id="51-discussion">5.1 Discussion</h3>
 <p>Pooled effects are unstable across specifications, so "near a good school always raises prices" is not supported once richer controls are added. Town-level heterogeneity is also strong and mixed in sign, arguing against a single citywide premium.</p>
@@ -481,7 +481,7 @@ The resale price distribution is right-skewed with a high-value tail, which supp
 <h3 id="61-overview">6.1 Overview</h3>
 <p>The architecture used in the second report has four layers: frontend, FastAPI backend, offline model artifacts, and an LLM query layer. The backend handles retrieval, filtering, and inference, while artifacts are precomputed offline and loaded at runtime.</p>
 <h3 id="62-model-serving">6.2 Model Serving</h3>
-<p>Models are trained offline and served from serialized artifacts (<code>ridge_pipeline.pkl</code>, <code>metrics.json</code>, <code>ols_coefficients.csv</code>, and RDD/town-premium tables under <code>data/</code> on the <code>api</code> branch). Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.</p>
+<p>Models are trained offline and served from serialized artifacts and precomputed analytical tables in the API data layer. Prediction requests are validated, defaults are applied for missing fields, features are engineered, and ridge inference is executed.</p>
 <h3 id="63-llm-interface">6.3 LLM Interface</h3>
 <pre><code class="language-mermaid">flowchart LR
     U[&quot;User Question&quot;] --&gt; F[&quot;Frontend Chat Input&quot;]
